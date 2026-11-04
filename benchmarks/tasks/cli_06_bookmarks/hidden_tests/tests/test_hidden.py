@@ -59,14 +59,17 @@ def test_list_format_is_tab_separated_with_empty_tag_field(tmp_path):
     run(tmp_path, "add", "https://b.example")
     r = run(tmp_path, "list")
     assert r.returncode == 0
-    assert r.stdout == "1\tAlpha\thttps://a.example\tb,a\n2\thttps://b.example\thttps://b.example\t\n"
+    assert r.stdout == (
+        "1\tAlpha\thttps://a.example\tb,a\n2\thttps://b.example\thttps://b.example\t\n"
+    )
 
 
 def test_list_filter_by_tag_is_case_insensitive_and_keeps_id_order(tmp_path):
     run(tmp_path, "add", "u1", "--tag", "news")
     run(tmp_path, "add", "u2", "--tag", "tech")
     run(tmp_path, "add", "u3", "--tag", "tech", "--tag", "news")
-    assert run(tmp_path, "list", "--tag", " NEWS ").stdout == "1\tu1\tu1\tnews\n3\tu3\tu3\ttech,news\n"
+    listed = run(tmp_path, "list", "--tag", " NEWS ").stdout
+    assert listed == "1\tu1\tu1\tnews\n3\tu3\tu3\ttech,news\n"
     assert run(tmp_path, "list", "--tag", "nothing").stdout == ""
     assert run(tmp_path, "list", "--tag", "ne").stdout == ""
 
