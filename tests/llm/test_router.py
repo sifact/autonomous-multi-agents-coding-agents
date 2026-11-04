@@ -22,7 +22,7 @@ def test_role_mapping():
         router.for_role(role)
     for role in ("coder", "debugger"):
         router.for_role(role)
-    assert made == ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]  # cached per model
+    assert made == ["llama-3.1-8b-instant"] * 3 + ["llama-3.3-70b-versatile"] * 2
 
 
 def test_all_strong_ablation():
@@ -122,10 +122,24 @@ def test_max_rpm_reaches_default_groq_models_and_is_shared():
     assert planner._limiter is coder._limiter  # one account-wide limiter
 
 
-def test_same_model_instance_reused_across_for_role_calls():
+def test_each_for_role_call_builds_a_fresh_instance_with_independent_scripts():
+    scripts = iter([["plan"], ["review"]])
+    router = ModelRouter(Settings(groq_api_key="k"), factory=lambda m: FakeLLM(next(scripts)))
+    planner, reviewer = router.for_role("planner"), router.for_role("reviewer")
+    assert planner is not reviewer
+    assert reviewer.invoke("s", "u").text == "review"
+    assert planner.invoke("s", "u").text == "plan"
+
+
+def test_limiter_shared_by_distinct_instances_for_same_model():
     router = ModelRouter(Settings(groq_api_key="k", max_rpm=7))
-    assert router.for_role("coder") is router.for_role("debugger")
-    assert router.for_role("planner") is router.for_role("reviewer")
+    a, b = router.for_role("planner"), router.for_role("reviewer")
+    assert a is not b and a._limiter is b._limiter
+
+
+def test_no_limiter_built_with_custom_factory():
+    router = ModelRouter(Settings(groq_api_key="k", max_rpm=7), factory=lambda m: FakeLLM([]))
+    assert router._limiter is None
 
 
 def test_no_limiter_without_max_rpm():

@@ -113,6 +113,8 @@ class GroqChatModel:
             raise MissingApiKeyError("GROQ_API_KEY is not set; add it to the environment or .env")
         self.model = model
         self._api_key = api_key
+        if max_rpm is not None and limiter is not None:
+            raise ValueError("pass either max_rpm or limiter, not both")
         self._limiter = limiter or (
             RateLimiter(max_rpm, clock=clock, sleep=sleep) if max_rpm is not None else None
         )

@@ -243,3 +243,8 @@ def test_retry_after_header_absent_is_none():
 def test_content_text_joins_list_parts():
     assert _content_text("plain") == "plain"
     assert _content_text(["a", {"type": "text", "text": "b"}, {"type": "image"}]) == "ab"
+
+
+def test_max_rpm_and_limiter_together_rejected():
+    with pytest.raises(ValueError, match="max_rpm.*limiter"):
+        GroqChatModel("m", "k", max_rpm=5, limiter=RateLimiter(5))
