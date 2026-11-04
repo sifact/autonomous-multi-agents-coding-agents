@@ -1,0 +1,33 @@
+{
+  "name": "svc",
+  "debug": false,
+  "port": 8080,
+  "owner": null,
+  "db": {
+    "host": "localhost",
+    "ports": [
+      5432,
+      5433
+    ],
+    "opts": {}
+  },
+  "servers": [
+    {
+      "id": 1,
+      "tags": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "id": 2,
+      "tags": []
+    }
+  ],
+  "limits": {
+    "cpu": {
+      "max": 2.5,
+      "min": 0.5
+    }
+  }
+}
