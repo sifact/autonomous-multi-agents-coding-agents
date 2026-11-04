@@ -1,0 +1,35 @@
+2024-03-01 12:00:59 [INFO] request 0 handled
+2024-03-01 12:01:57 [DEBUG] request 1 handled
+2024-03-01 12:02:33 [INFO] request 2 handled
+2024-03-01 12:03:43 [INFO] request 3 handled
+2024-03-01 12:04:06 [WARNING] request 4 handled
+2024-03-01 12:05:08 [DEBUG] request 5 handled
+Traceback (most recent call last):
+  File "app.py", line 3, in <module>
+ValueError: boom
+2024-03-01 12:06:06 [DEBUG] request 6 handled
+2024-03-01 12:07:56 [INFO] request 7 handled
+2024-03-01 12:08:42 [ERROR] request 8 handled
+2024-03-01 12:09:05 [DEBUG] request 9 handled
+2024-03-01 12:10:00 [WARNING] request 10 handled
+2024-03-01 12:11:42 [INFO] request 11 handled
+2024-03-01 12:12:47 [WARNING] request 12 handled
+2024-03-01 12:12:30 [INFO] user typed [ERROR] in the search box
+2024-03-01 12:13:11 [ERROR] request 13 handled
+2024-03-01 12:14:09 [INFO] request 14 handled
+2024-03-01 12:15:46 [WARNING] request 15 handled
+2024-03-01 12:16:19 [INFO] request 16 handled
+2024-03-01 12:17:47 [DEBUG] request 17 handled
+2024-03-01 12:18:35 [INFO] request 18 handled
+2024-03-01 12:19:17 [INFO] request 19 handled
+2024-03-01 12:20:59 [DEBUG] request 20 handled
+2024-03-01 12:20:30 [error] lower case is not a level
+2024-03-01 12:21:37 [WARNING] request 21 handled
+2024-03-01 12:22:04 [INFO] request 22 handled
+2024-03-01 12:23:17 [INFO] request 23 handled
+2024-03-01 12:24:27 [INFO] request 24 handled
+2024-03-01 12:25:48 [DEBUG] request 25 handled
+2024-03-01 12:26:38 [DEBUG] request 26 handled
+2024-03-01 12:27:35 [INFO] request 27 handled
+2024-03-01 12:28:07 [DEBUG] request 28 handled
+2024-03-01 12:29:49 [WARNING] request 29 handled
