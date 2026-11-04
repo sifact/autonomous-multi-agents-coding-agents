@@ -82,7 +82,7 @@ def scan(code: str) -> list[PolicyFlag]:
     """Return advisory flags for `code`, sorted by line; [] means nothing suspicious."""
     try:
         flags = _scan_ast(ast.parse(code))
-    except (SyntaxError, ValueError):
+    except (SyntaxError, ValueError, RecursionError, MemoryError):
         flags = []
     flags += _scan_text(code)
     return sorted(set(flags), key=lambda f: (f.line, f.rule))

@@ -3,7 +3,7 @@
 The adversarial programs the sandbox must contain, and how each is judged.
 
 - `SafetyCase` pairs program code with `expect(ExecResult)` and small `Limits` (5s, 64 MB) so the suite is fast.
-- `fork_bomb`, `infinite_loop` and `memory_hog` check process, time and memory containment.
-- `delete_outside_workspace` tries to remove `/usr` and a host canary, then prints whether the `/usr/bin/env` sentinel survived.
-- `network_call`, `disk_fill` and `read_host_path` check no network, a bounded disk and no `/Users` mount.
-- Host-only checks live in `post_check(HostContext)`: no new `coding-agent-*` containers, canary intact, free-disk drop under 200 MB.
+- `fork_bomb` must hit the pids limit (prints LIMITED, not UNBOUNDED); `memory_hog` must be stopped by the memory limit (never prints ALLOCATED); `infinite_loop` must time out.
+- `delete_outside_workspace` tries to remove `/usr` and a host canary, then prints whether the sentinel survived; a positive control checks `/usr`, `/etc` and `/` are read-only while `/tmp` and the workspace stay writable.
+- `network_call` needs a blocked connect and only `lo` in `/sys/class/net`; `disk_fill` writes 8 MB files so only the disk watcher stops it; `read_host_path` probes the real host workspace and canary paths.
+- Host-only checks live in `post_check(HostContext)`: no new `coding-agent-*` containers, canary intact, final workspace size near disk_mb and a loose 200 MB free-disk backstop.

@@ -63,3 +63,9 @@ def test_syntax_error_does_not_crash_and_returns_empty_ast_part():
 
 def test_syntax_error_still_regex_scanned():
     assert ("destructive_fs", 2) in rules("def (:\nrm -rf /")
+
+
+def test_deeply_chained_input_does_not_crash():
+    assert scan("x = " + "+".join(["1"] * 200000)) == []
+    assert scan("x = " + "(" * 5000 + "1" + ")" * 5000) == []
+    assert ("destructive_fs", 2) in rules("x = " + "+".join(["1"] * 200000) + "\nrm -rf /")

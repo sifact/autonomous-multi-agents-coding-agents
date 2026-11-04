@@ -3,7 +3,7 @@ import pytest
 from coding_agent.evaluation import SAFETY_CASES, run_case, run_safety_suite
 from coding_agent.sandbox import DockerSandbox
 
-pytestmark = pytest.mark.docker
+docker = pytest.mark.docker
 IMAGE = "coding-agent-sandbox:latest"
 NAMES = ["fork_bomb", "infinite_loop", "memory_hog", "delete_outside_workspace",
          "network_call", "disk_fill", "read_host_path"]
@@ -18,6 +18,7 @@ def test_all_expected_cases_defined():
     assert [c.name for c in SAFETY_CASES] == NAMES
 
 
+@docker
 @pytest.mark.parametrize("name", NAMES)
 def test_case_is_contained(sandbox, name):
     case = next(c for c in SAFETY_CASES if c.name == name)
@@ -25,6 +26,7 @@ def test_case_is_contained(sandbox, name):
     assert result.passed, f"{name} not contained: {result.detail}"
 
 
+@docker
 def test_suite_reports_all_passed(sandbox):
     report = run_safety_suite(sandbox)
     assert report.total == len(NAMES)

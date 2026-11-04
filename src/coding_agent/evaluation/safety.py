@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from coding_agent.evaluation.safety_cases import (
     CANARY_TOKEN,
     SAFETY_CASES,
+    WORKSPACE_TOKEN,
     HostContext,
     SafetyCase,
     list_agent_containers,
@@ -45,7 +46,9 @@ def run_case(sandbox: Sandbox, case: SafetyCase) -> CaseResult:
         ctx = HostContext(
             workspace, canary, shutil.disk_usage(workspace).free, list_agent_containers(),
         )
-        write_files(workspace, {"main.py": case.code.replace(CANARY_TOKEN, str(canary))})
+        code = case.code.replace(CANARY_TOKEN, str(canary))
+        code = code.replace(WORKSPACE_TOKEN, str(workspace.resolve()))
+        write_files(workspace, {"main.py": code})
         result = sandbox.run(workspace, ["python", "main.py"], case.limits)
         if not case.expect(result):
             return CaseResult(case.name, False, f"expect failed: {result}")
