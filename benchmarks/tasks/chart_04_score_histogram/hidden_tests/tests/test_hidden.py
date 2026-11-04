@@ -132,3 +132,10 @@ def test_png_comes_from_build_figure_called_with_default_edges(tmp_path, monkeyp
     assert seen["rows"] == [10.0, 70.5]
     assert seen["edges"] is None or list(seen["edges"]) == DEFAULT
     assert png_size(out) == (500, 300)
+
+
+def test_mean_is_rounded_not_truncated(tmp_path):
+    path = write_csv(tmp_path, "student,score\na,1\nb,2\nc,2\n")
+    summary = save_chart(path, str(tmp_path / "m.png"))
+    assert summary["mean"] == 1.67
+    assert summary["counts"] == [3, 0, 0, 0, 0]

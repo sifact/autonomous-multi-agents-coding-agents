@@ -157,3 +157,18 @@ def test_hand_formatted_file_is_byte_identical_after_reads_and_failures(tmp_path
         assert path.read_bytes() == ODD, args
     assert run(tmp_path, "list").stdout == "[ ] 1 café\n[x] 2 y\n"
     assert run(tmp_path, "add", "z").stdout == "added 3\n"
+
+
+def test_done_and_rm_on_missing_or_empty_state_exit_1(tmp_path):
+    for cmd in ("done", "rm"):
+        r = run(tmp_path, cmd, "1")
+        assert (r.returncode, r.stdout) == (1, ""), cmd
+        assert r.stderr.strip() == "error: no such id: 1"
+        assert not (tmp_path / "todo.json").exists()
+    empty = b'{"next_id": 1, "items": []}'
+    (tmp_path / "todo.json").write_bytes(empty)
+    for cmd in ("done", "rm"):
+        r = run(tmp_path, cmd, "1")
+        assert (r.returncode, r.stdout) == (1, ""), cmd
+        assert r.stderr.strip() == "error: no such id: 1"
+        assert (tmp_path / "todo.json").read_bytes() == empty

@@ -20,8 +20,8 @@ do not depend on a GUI backend.
 `save_chart(csv_path: str, png_path: str) -> dict`
 
 - `csv_path` is a UTF-8 CSV file with the header `hours,score`. The sample file `study.csv`
-  is in the working directory. Rows where either cell is empty are skipped; the other rows
-  are decimal numbers. Keep the rows in file order.
+  is in the working directory. Rows where either cell is empty (or only whitespace) are
+  skipped; the other rows are decimal numbers. Keep the rows in file order.
 - Build the figure by calling `build_figure` (looked up as a module-level name at call
   time) with the rows, and write it to `png_path` as a PNG with `dpi=100`. The errors of
   `build_figure` propagate and no PNG has to be written then.

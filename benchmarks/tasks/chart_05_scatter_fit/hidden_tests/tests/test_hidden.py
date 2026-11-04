@@ -162,3 +162,9 @@ def test_r_squared_comes_from_the_unrounded_fit(tmp_path):
         tmp_path, "hours,score\n1,100.0\n2,100.007\n3,100.004\n4,100.008\n5,100.003\n")
     s = save_chart(path, str(tmp_path / "r.png"))
     assert s == {"n": 5, "slope": 0.001, "intercept": 100.002, "r_squared": 0.119}
+
+
+def test_whitespace_only_cells_are_skipped(tmp_path):
+    path = write_csv(tmp_path, "hours,score\n1,2\n 2, \n  ,5\n3,6\n")
+    summary = save_chart(path, str(tmp_path / "w.png"))
+    assert summary == {"n": 2, "slope": 2.0, "intercept": 0.0, "r_squared": 1.0}
