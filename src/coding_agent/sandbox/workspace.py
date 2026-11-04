@@ -22,6 +22,18 @@ def make_workspace(root: Path | None = None) -> Path:
     return path
 
 
+def _make_dirs(base: Path, directory: Path) -> None:
+    """mkdir -p, making each new dir world-writable (umask would give 0755)."""
+    missing = []
+    d = directory
+    while d != base and not d.exists():
+        missing.append(d)
+        d = d.parent
+    for d in reversed(missing):
+        d.mkdir()
+        d.chmod(0o777)
+
+
 def write_files(workspace: Path, files: dict[str, str]) -> None:
     """Write files into the workspace, refusing absolute or escaping paths."""
     base = workspace.resolve()
@@ -34,7 +46,7 @@ def write_files(workspace: Path, files: dict[str, str]) -> None:
             raise PathEscapeError(f"path escapes workspace: {rel!r}")
         targets.append((target, content))
     for target, content in targets:
-        target.parent.mkdir(parents=True, exist_ok=True)
+        _make_dirs(base, target.parent)
         target.write_text(content)
         target.chmod(0o666)
 

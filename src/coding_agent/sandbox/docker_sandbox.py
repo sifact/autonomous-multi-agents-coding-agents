@@ -40,7 +40,7 @@ class DockerSandbox:
 
     def _docker_args(self, name: str, workspace: Path, limits: Limits, command: list[str]) -> list[str]:
         args = [
-            "docker", "run", "--rm", "--name", name,
+            "docker", "run", "--name", name,
             "--user", "1000:1000",
             "--cap-drop", "ALL",
             "--security-opt", "no-new-privileges",
@@ -62,8 +62,22 @@ class DockerSandbox:
 
     @staticmethod
     def _kill(name: str) -> None:
-        subprocess.run(["docker", "kill", name], capture_output=True, timeout=30)
-        subprocess.run(["docker", "rm", "-f", name], capture_output=True, timeout=30)
+        subprocess.run(["docker", "kill", name], capture_output=True, timeout=30, check=False)
+
+    @staticmethod
+    def _finish(name: str) -> bool:
+        """Kill if still running, read State.OOMKilled, then remove the container.
+
+        --rm is not used so the OOM flag can be inspected before removal; the
+        exit code 137 alone cannot tell OOM from a manual kill.
+        """
+        subprocess.run(["docker", "kill", name], capture_output=True, timeout=30, check=False)
+        insp = subprocess.run(
+            ["docker", "inspect", "-f", "{{.State.OOMKilled}}", name],
+            capture_output=True, text=True, timeout=30, check=False,
+        )
+        subprocess.run(["docker", "rm", "-f", name], capture_output=True, timeout=30, check=False)
+        return insp.stdout.strip() == "true"
 
     def run(self, workspace: Path, command: list[str], limits: Limits | None = None) -> ExecResult:
         limits = limits or Limits()
@@ -83,9 +97,11 @@ class DockerSandbox:
         watcher = threading.Thread(target=watch_disk, daemon=True)
         watcher.start()
         timed_out = False
+        oom = False
         try:
             proc = subprocess.run(
-                args, capture_output=True, text=True, errors="replace", timeout=limits.timeout_s
+                args, capture_output=True, text=True, errors="replace", timeout=limits.timeout_s,
+                check=False,
             )
             code, out, err = proc.returncode, proc.stdout, proc.stderr
         except subprocess.TimeoutExpired as exc:
@@ -96,7 +112,7 @@ class DockerSandbox:
         finally:
             stop.set()
             watcher.join()
-            self._kill(name)  # guarantees no orphan, even on timeout or error
+            oom = self._finish(name)  # guarantees no orphan, even on timeout or error
         if _dir_size(workspace) > limits.disk_mb * _MB:
             disk_exceeded.set()
         return ExecResult(
@@ -104,7 +120,7 @@ class DockerSandbox:
             stdout=out,
             stderr=err,
             timed_out=timed_out,
-            oom_killed=code == 137 and not timed_out and not disk_exceeded.is_set(),
+            oom_killed=oom,
             duration_s=time.monotonic() - start,
             disk_exceeded=disk_exceeded.is_set(),
         )
