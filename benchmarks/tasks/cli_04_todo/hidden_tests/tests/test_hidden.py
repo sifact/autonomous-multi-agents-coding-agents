@@ -101,7 +101,8 @@ def test_unknown_id_exits_1_and_changes_nothing(tmp_path):
 def test_usage_errors_exit_2_and_never_create_the_file(tmp_path):
     cases = [(), ("frobnicate",), ("add",), ("add", "  "), ("add", ""), ("done",),
              ("done", "x"), ("done", "0"), ("rm", "-1"), ("rm", "1.5"), ("rm", "1", "2"),
-             ("done", "²"), ("list", "extra"), ("list", "--bogus")]
+             ("done", "²"), ("done", "+1"), ("done", " 1"), ("rm", "1.0"), ("rm", "٣"),
+             ("list", "extra"), ("list", "--bogus")]
     for args in cases:
         r = run(tmp_path, *args)
         assert r.returncode == 2, args
@@ -118,7 +119,9 @@ def test_unicode_text_round_trips(tmp_path):
 
 def test_corrupt_state_exits_3_for_every_command_and_is_unchanged(tmp_path):
     bad = [b"{oops", b"[]", b'{"next_id": 1}', b'{"next_id": "1", "items": []}',
-           b'{"next_id": 2, "items": [{"id": 1, "text": "x"}]}', b""]
+           b'{"next_id": 2, "items": [{"id": 1, "text": "x"}]}',
+           b'{"next_id": 2, "items": [{"id": "1", "text": "x", "done": false}]}',
+           b'{"next_id": 2, "items": [{"id": 1, "text": "x", "done": 0}]}', b""]
     for content in bad:
         (tmp_path / "todo.json").write_bytes(content)
         for args in (("list",), ("add", "x"), ("done", "1"), ("rm", "1")):
@@ -137,3 +140,20 @@ def test_preexisting_state_is_honoured(tmp_path):
     assert state(tmp_path) == {
         "next_id": 11, "items": [item(4, "old", True), item(9, "newer", True), item(10, "fresh")],
     }
+
+
+ODD = (b'{ "next_id":3,\n  "items" : [ {"id":1,"text":"caf\xc3\xa9",  "done":false} ,\n'
+       b'{"id":2 , "text":"y","done":true}]}\n\n')
+
+
+def test_hand_formatted_file_is_byte_identical_after_reads_and_failures(tmp_path):
+    path = tmp_path / "todo.json"
+    path.write_bytes(ODD)
+    cases = [("list",), ("list", "--pending"), ("done", "2"), ("done", "9"), ("rm", "9"),
+             ("rm", "0"), ("done", "0"), ("rm", "-1"), ("done", "x"), ("rm",), ("add",),
+             ("add", " "), ("frob",), (), ("list", "x"), ("rm", "1", "2"), ("done", "+1")]
+    for args in cases:
+        run(tmp_path, *args)
+        assert path.read_bytes() == ODD, args
+    assert run(tmp_path, "list").stdout == "[ ] 1 café\n[x] 2 y\n"
+    assert run(tmp_path, "add", "z").stdout == "added 3\n"

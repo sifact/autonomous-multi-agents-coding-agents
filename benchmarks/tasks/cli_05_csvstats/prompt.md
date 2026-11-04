@@ -5,8 +5,10 @@ A sample file `orders.csv` is in the working directory.
   It may start with a UTF-8 byte order mark, which must be ignored (use `utf-8-sig`). The
   first record is the header. `NAME` is matched exactly against the header names
   (case-sensitive); if a name occurs twice, the first such column is used.
-- Data records are numbered from 1 after the header. Completely blank lines are skipped and
-  are not counted. A record shorter than the header counts as an empty cell for the missing
+- Data records are numbered from 1 after the header. Completely blank lines (zero
+  characters) are skipped and are not counted; a line with only spaces is a normal record.
+  Records whose cell in the column is empty still count for the numbering. A record shorter
+  than the header counts as an empty cell for the missing
   columns.
 - A cell is stripped of leading and trailing whitespace; an empty cell is skipped. Any other
   cell must parse with `float()` and be finite (`nan` and `inf` are not numbers).

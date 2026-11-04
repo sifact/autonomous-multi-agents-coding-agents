@@ -27,7 +27,9 @@ Commands:
   ascending in plain string order. No tags prints nothing.
 
 Every output line ends with `\n`. Only `add` and `rm` write the file; other commands and
-failing commands leave it untouched (and never create it).
+failing commands leave it byte for byte untouched, even if it is formatted by hand (and
+never create it). The URL is stripped before the duplicate check, so `add u` followed by
+`add "  u  "` prints `exists 1`.
 
 Errors print nothing on standard output, put a message on standard error and exit with a
 status code:

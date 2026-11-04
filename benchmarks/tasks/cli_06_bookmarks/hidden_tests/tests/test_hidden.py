@@ -139,3 +139,27 @@ def test_corrupt_state_exits_3_for_every_command_and_is_unchanged(tmp_path):
             assert (r.returncode, r.stdout) == (3, ""), (content, args)
             assert r.stderr.strip() != ""
             assert (tmp_path / "bookmarks.json").read_bytes() == content
+
+
+ODD = (b'{ "next_id":3,\n "items":[ {"id":1,"url":"u1","title":"T\xc3\xa4","tags":["b","a"]} ,\n'
+       b' {"id":2,"url":"u2","title":"u2","tags":[]}] }\n\n')
+
+
+def test_hand_formatted_file_is_byte_identical_after_reads_and_failures(tmp_path):
+    path = tmp_path / "bookmarks.json"
+    path.write_bytes(ODD)
+    cases = [("list",), ("list", "--tag", "a"), ("tags",), ("rm", "9"), ("rm", "0"),
+             ("rm", "x"), ("rm",), ("add",), ("add", " "), ("add", "u1", "--tag", " "),
+             ("add", "new", "--tag", ""), ("add", "u3", "--tag"), ("frob",), (),
+             ("tags", "x"), ("list", "x"), ("rm", "1", "2")]
+    for args in cases:
+        run(tmp_path, *args)
+        assert path.read_bytes() == ODD, args
+    assert run(tmp_path, "tags").stdout == "a 1\nb 1\n"
+
+
+def test_url_is_stripped_before_the_duplicate_check(tmp_path):
+    assert run(tmp_path, "add", "u").stdout == "added 1\n"
+    r = run(tmp_path, "add", "  u  ", "--tag", "x")
+    assert (r.returncode, r.stdout) == (0, "exists 1\n")
+    assert state(tmp_path) == {"next_id": 2, "items": [item(1, "u", None, ["x"])]}

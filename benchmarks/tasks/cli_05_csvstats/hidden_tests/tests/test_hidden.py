@@ -131,3 +131,15 @@ def test_usage_and_file_errors_exit_2(tmp_path):
     r = run(tmp_path, "nope.csv", "--column", "v")
     assert (r.returncode, r.stdout) == (2, "")
     assert r.stderr.strip() != ""
+
+
+def test_empty_cells_and_space_only_lines_still_count_in_row_numbers(tmp_path):
+    f = csv_file(tmp_path, "v,w\n,1\n5,2\nabc,3\n")
+    assert run(tmp_path, f, "--column", "v").stderr == "error: row 3: not a number: abc\n"
+    f = csv_file(tmp_path, "v\n1\n  \nabc\n")
+    assert run(tmp_path, f, "--column", "v").stderr == "error: row 3: not a number: abc\n"
+
+
+def test_float_syntax_variants_are_numbers(tmp_path):
+    f = csv_file(tmp_path, "v\n.5\n5.\n")
+    assert run(tmp_path, f, "--column", "v").stdout == stats(2, "0.50", "5.00", "2.75", "2.75")

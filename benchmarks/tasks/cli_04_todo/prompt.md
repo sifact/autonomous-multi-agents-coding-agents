@@ -9,7 +9,8 @@ State is kept in `todo.json` in the current directory (UTF-8), one JSON object:
 file is the empty state `{"next_id": 1, "items": []}`. Ids start at 1 and are never reused,
 even after `rm` (so `next_id` only ever grows).
 
-Commands (an `ID` argument must be an integer of at least 1, otherwise exit 2):
+Commands (an `ID` argument must consist only of ASCII digits and be at least 1, so `0`, `-1`, `+1`,
+` 1`, `1.0` and `²` are invalid and give exit 2):
 
 - `add TEXT...`: the arguments joined with single spaces, then stripped of leading and
   trailing whitespace (inner spacing is kept), become the item text, with `done` false. The
@@ -23,7 +24,7 @@ Commands (an `ID` argument must be an integer of at least 1, otherwise exit 2):
 
 Output goes to standard output, each line ends with `\n`. The file is written only by
 commands that change it (`add`, a first `done`, `rm`); other commands and failing commands
-leave it untouched (and do not create it).
+leave it untouched, byte for byte, even if it is formatted by hand (and do not create it).
 
 Errors print nothing on standard output, put a message starting with `error:` on standard
 error and exit with a status code:

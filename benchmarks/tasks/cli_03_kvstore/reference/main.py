@@ -1,4 +1,3 @@
-import argparse
 import json
 import sys
 from pathlib import Path
@@ -25,36 +24,34 @@ def save(path: Path, store: dict[str, str]) -> None:
 
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--file", default="store.json")
-    parser.add_argument("command", nargs="?")
-    parser.add_argument("rest", nargs="*")
-    try:
-        args = parser.parse_args(argv)
-    except SystemExit:
-        return 2
-    if args.command not in ARITY:
-        return fail(2, f"unknown command: {args.command}")
-    if len(args.rest) != ARITY[args.command]:
-        return fail(2, f"wrong number of arguments for {args.command}")
-    path = Path(args.file)
+    path = Path("store.json")
+    rest = list(argv)
+    if rest and rest[0] == "--file":
+        if len(rest) < 2:
+            return fail(2, "--file needs a value")
+        path, rest = Path(rest[1]), rest[2:]
+    if not rest or rest[0] not in ARITY:
+        return fail(2, f"unknown command: {rest[0] if rest else None}")
+    command, rest = rest[0], rest[1:]
+    if len(rest) != ARITY[command]:
+        return fail(2, f"wrong number of arguments for {command}")
+    if command == "set" and rest[0] == "":
+        return fail(2, "key must not be empty")
     try:
         store = load(path)
     except ValueError as exc:  # JSONDecodeError is a ValueError
         return fail(3, f"bad store file {path}: {exc}")
-    if args.command == "list":
+    if command == "list":
         for key in sorted(store):
             print(f"{key}={store[key]}")
         return 0
-    key = args.rest[0]
-    if args.command == "set":
-        if key == "":
-            return fail(2, "key must not be empty")
-        store[key] = args.rest[1]
+    key = rest[0]
+    if command == "set":
+        store[key] = rest[1]
         save(path, store)
     elif key not in store:
         return fail(1, f"key not found: {key}")
-    elif args.command == "get":
+    elif command == "get":
         print(store[key])
     else:
         del store[key]

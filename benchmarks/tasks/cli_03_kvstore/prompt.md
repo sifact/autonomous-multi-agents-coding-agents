@@ -2,7 +2,9 @@ Write `main.py`, a tiny persistent key-value store, run as
 `python main.py [--file PATH] COMMAND [ARGS...]`.
 
 State lives in a JSON file: `--file PATH` if given (it comes before the command), otherwise
-`store.json` in the current directory. The file holds one JSON object mapping string keys to
+`store.json` in the current directory. `--file` is only recognised as the very first argument
+(it needs a value, else exit 2); every later argument is a plain value, even if it starts
+with `-` (so `set mode -v` stores `-v`). The file holds one JSON object mapping string keys to
 string values, e.g. `{"name": "Ada", "port": "8080"}`. Read and write it as UTF-8. A file that
 does not exist is an empty store.
 
@@ -18,8 +20,9 @@ Commands (keys and values are command-line arguments, always stored as strings, 
 
 Rules for the file:
 
-- `set` creates the file when needed. `get`, `list` and a failing `del` never create or
-  change the file. Removing the last key leaves `{}` in the file.
+- `set` creates the file when needed. `get`, `list` and every failing command never create or
+  change the file (not even its formatting: it stays byte for byte as it was). Removing the
+  last key leaves `{}` in the file.
 
 Errors print nothing on standard output, put a message starting with `error:` on standard
 error, and exit with a status code:

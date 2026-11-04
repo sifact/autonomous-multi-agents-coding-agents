@@ -105,6 +105,32 @@ def test_usage_errors_exit_2(tmp_path):
     assert not (tmp_path / "store.json").exists()
 
 
+ODD = b'{ "zeta":"1",\n\n   "alpha" :   "caf\xc3\xa9",\t"mid":"x" }\n\n'
+
+
+def test_failures_and_reads_leave_a_hand_formatted_file_byte_identical(tmp_path):
+    path = tmp_path / "store.json"
+    path.write_bytes(ODD)
+    cases = [("get", "zeta"), ("list",), ("get", "nokey"), ("del", "nokey"), (),
+             ("frobnicate",), ("set", "a"), ("set", "a", "b", "c"), ("get",),
+             ("del", "a", "b"), ("list", "extra"), ("set", "", "x"), ("--file",)]
+    for args in cases:
+        run(tmp_path, *args)
+        assert path.read_bytes() == ODD, args
+    assert run(tmp_path, "list").stdout == "alpha=café\nmid=x\nzeta=1\n"
+
+
+def test_values_and_keys_may_start_with_a_dash(tmp_path):
+    assert run(tmp_path, "set", "mode", "-v").returncode == 0
+    assert run(tmp_path, "set", "-k", "--file").returncode == 0
+    assert run(tmp_path, "set", "n", "-5").returncode == 0
+    assert state(tmp_path) == {"mode": "-v", "-k": "--file", "n": "-5"}
+    assert run(tmp_path, "get", "-k").stdout == "--file\n"
+    assert run(tmp_path, "del", "-k").returncode == 0
+    assert run(tmp_path, "--file", "o.json", "set", "x", "-y").returncode == 0
+    assert state(tmp_path, "o.json") == {"x": "-y"}
+
+
 def test_corrupt_files_exit_3_for_every_command_and_stay_unchanged(tmp_path):
     for content in (b"{not json", b'["a", "b"]', b'{"a": 1}', b'{"a": {"b": "c"}}', b""):
         (tmp_path / "store.json").write_bytes(content)
