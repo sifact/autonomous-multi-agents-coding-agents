@@ -1,0 +1,10 @@
+2024-05-01 10:00:00 INFO server started
+2024-05-01 10:00:05 DEBUG cache warm
+2024-05-01 10:01:10 WARN slow query
+  took 2.5s
+2024-05-01 10:02:00 ERROR request failed
+Traceback (most recent call last):
+  File "app.py", line 3, in handler
+ValueError: bad input
+
+2024-05-01 10:03:00 INFO recovered

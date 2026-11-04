@@ -1,0 +1,6 @@
+id,region,amount,note
+1,"north, east",10.5,first
+2,south,20,
+3,north, 7 ,ok
+4,east,,missing amount
+5,west,3.5,x
