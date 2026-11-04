@@ -8,6 +8,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import pytest  # noqa: E402
 
+import solution  # noqa: E402
 from solution import build_figure, save_chart  # noqa: E402
 
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -125,3 +126,20 @@ def test_save_chart_unicode_months_and_overwrite(tmp_path):
     out.write_bytes(b"old")
     assert save_chart(path, str(out))["best_month"] == "Jänner"
     assert out.read_bytes()[:8] == SIGNATURE
+
+
+def test_png_comes_from_the_figure_returned_by_build_figure(tmp_path, monkeypatch):
+    from matplotlib.figure import Figure
+
+    seen = {}
+
+    def fake(rows):
+        seen["rows"] = [tuple(r) for r in rows]
+        return Figure(figsize=(5, 3))
+
+    monkeypatch.setattr(solution, "build_figure", fake)
+    path = write_csv(tmp_path, "month,revenue\nB,2\nA,\nC,3.5\n")
+    out = tmp_path / "spy.png"
+    solution.save_chart(path, str(out))
+    assert seen["rows"] == [("B", 2.0), ("C", 3.5)]
+    assert png_size(out) == (500, 300)

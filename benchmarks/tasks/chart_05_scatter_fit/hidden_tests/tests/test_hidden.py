@@ -154,3 +154,11 @@ def test_png_depends_on_the_data(tmp_path):
     save_chart(a, str(tmp_path / "a.png"))
     save_chart(b, str(tmp_path / "b.png"))
     assert (tmp_path / "a.png").read_bytes() != (tmp_path / "b.png").read_bytes()
+
+
+def test_r_squared_comes_from_the_unrounded_fit(tmp_path):
+    # slope 0.0007 and intercept 100.0023 rounded first would give r2 0.053, not 0.119
+    path = write_csv(
+        tmp_path, "hours,score\n1,100.0\n2,100.007\n3,100.004\n4,100.008\n5,100.003\n")
+    s = save_chart(path, str(tmp_path / "r.png"))
+    assert s == {"n": 5, "slope": 0.001, "intercept": 100.002, "r_squared": 0.119}

@@ -24,7 +24,9 @@ depend on a GUI backend.
   decimal number. The sample file `spend.csv` is in the working directory. The same category
   may appear on several rows: add its amounts together before charting (a category keeps
   the position of its first appearance in the aggregated list given to `build_figure`).
-- Build the figure with `build_figure` and write it to `png_path` as a PNG with `dpi=100`.
+- Build the figure by calling `build_figure` (looked up as a module-level name at call
+  time) with the aggregated list, and write the figure it returns to `png_path` as a PNG
+  with `dpi=100`.
 - Return a dict with exactly these keys:
   - `"total"`: the sum of all amounts, `round(total, 2)`;
   - `"slices"`: a list with one `(label, percent)` pair (a tuple or a list) per wedge, in

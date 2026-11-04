@@ -20,10 +20,12 @@ on a GUI backend.
 `save_chart(csv_path: str, png_path: str) -> dict`
 
 - `csv_path` is a UTF-8 CSV file with the header `student,score`. The sample file
-  `scores.csv` is in the working directory. Rows with an empty `score` are skipped; all
+  `scores.csv` is in the working directory. Rows whose `score` is empty (or only whitespace)
+  are skipped; all
   other scores are decimal numbers.
-- Build the figure with the default edges and write it to `png_path` as a PNG with
-  `dpi=100`.
+- Build the figure by calling `build_figure` (looked up as a module-level name at call
+  time) with the scores and the default edges (`edges=None` or the default list), and write
+  the figure it returns to `png_path` as a PNG with `dpi=100`.
 - Return a dict with exactly these keys:
   - `"counts"`: the list of the bin counts as ints, in bin order;
   - `"edges"`: the list `[0, 20, 40, 60, 80, 100]`;

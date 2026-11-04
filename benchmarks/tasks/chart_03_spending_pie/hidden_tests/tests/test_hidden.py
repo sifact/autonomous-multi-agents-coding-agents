@@ -9,6 +9,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import pytest  # noqa: E402
 
+import solution  # noqa: E402
 from solution import build_figure, save_chart  # noqa: E402
 
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -140,3 +141,22 @@ def test_save_chart_variant_and_hard_coding_is_rejected(tmp_path):
     assert summary["total"] == 4
     assert [tuple(s) for s in summary["slices"]] == [("Y", 75.0), ("X", 25.0)]
     assert (tmp_path / "v.png").read_bytes() != (tmp_path / "w.png").read_bytes()
+
+
+def test_png_comes_from_build_figure_with_aggregated_rows(tmp_path, monkeypatch):
+    from matplotlib.figure import Figure
+
+    seen = {}
+
+    def fake(rows):
+        seen["rows"] = [tuple(r) for r in rows]
+        return Figure(figsize=(5, 3))
+
+    monkeypatch.setattr(solution, "build_figure", fake)
+    out = tmp_path / "spy.png"
+    solution.save_chart("spend.csv", str(out))
+    assert seen["rows"] == [
+        ("Rent", 1200), ("Food", 550), ("Fun", 120), ("Coffee", 30), ("Misc", 20),
+        ("Transport", 80),
+    ]
+    assert png_size(out) == (500, 300)

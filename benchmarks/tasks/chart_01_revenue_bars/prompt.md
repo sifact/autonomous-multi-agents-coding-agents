@@ -16,9 +16,11 @@ on a GUI backend.
 `save_chart(csv_path: str, png_path: str) -> dict`
 
 - `csv_path` is a UTF-8 CSV file with the header `month,revenue`. The sample file
-  `revenue.csv` is in the working directory. Rows whose `revenue` cell is empty are skipped;
+  `revenue.csv` is in the working directory. Rows whose `revenue` cell is empty (or only
+  whitespace) are skipped;
   all other rows have a numeric revenue and a non-empty month. Keep the rows in file order.
-- Build the figure with `build_figure` and write it to `png_path` as a PNG with
+- Build the figure by calling `build_figure` (looked up as a module-level name at call
+  time) with the rows, and write the figure it returns to `png_path` as a PNG with
   `dpi=100` (so an 8 by 4.5 inch figure gives 800 by 450 pixels).
 - Return a dict with exactly these keys:
   - `"months"`: the number of bars (int);

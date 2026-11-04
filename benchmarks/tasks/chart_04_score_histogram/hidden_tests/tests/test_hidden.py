@@ -7,6 +7,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import pytest  # noqa: E402
 
+import solution  # noqa: E402
 from solution import build_figure, save_chart  # noqa: E402
 
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -112,3 +113,22 @@ def test_png_depends_on_the_data(tmp_path):
     save_chart(a, str(tmp_path / "a.png"))
     save_chart(b, str(tmp_path / "b.png"))
     assert (tmp_path / "a.png").read_bytes() != (tmp_path / "b.png").read_bytes()
+
+
+def test_png_comes_from_build_figure_called_with_default_edges(tmp_path, monkeypatch):
+    from matplotlib.figure import Figure
+
+    seen = {}
+
+    def fake(rows, edges=None):
+        seen["rows"] = list(rows)
+        seen["edges"] = edges
+        return Figure(figsize=(5, 3))
+
+    monkeypatch.setattr(solution, "build_figure", fake)
+    path = write_csv(tmp_path, "student,score\na,10\nb, \nc,70.5\n")
+    out = tmp_path / "spy.png"
+    solution.save_chart(path, str(out))
+    assert seen["rows"] == [10.0, 70.5]
+    assert seen["edges"] is None or list(seen["edges"]) == DEFAULT
+    assert png_size(out) == (500, 300)
