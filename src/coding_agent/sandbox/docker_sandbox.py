@@ -71,13 +71,16 @@ class DockerSandbox:
         --rm is not used so the OOM flag can be inspected before removal; the
         exit code 137 alone cannot tell OOM from a manual kill.
         """
-        subprocess.run(["docker", "kill", name], capture_output=True, timeout=30, check=False)
-        insp = subprocess.run(
-            ["docker", "inspect", "-f", "{{.State.OOMKilled}}", name],
-            capture_output=True, text=True, timeout=30, check=False,
-        )
-        subprocess.run(["docker", "rm", "-f", name], capture_output=True, timeout=30, check=False)
-        return insp.stdout.strip() == "true"
+        try:
+            subprocess.run(["docker", "kill", name], capture_output=True, timeout=30, check=False)
+            insp = subprocess.run(
+                ["docker", "inspect", "-f", "{{.State.OOMKilled}}", name],
+                capture_output=True, text=True, timeout=30, check=False,
+            )
+            return insp.stdout.strip() == "true"
+        finally:
+            # Always remove, even if kill/inspect raised, so no container leaks.
+            subprocess.run(["docker", "rm", "-f", name], capture_output=True, timeout=30, check=False)
 
     def run(self, workspace: Path, command: list[str], limits: Limits | None = None) -> ExecResult:
         limits = limits or Limits()
