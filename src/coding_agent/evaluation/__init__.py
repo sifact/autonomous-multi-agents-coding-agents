@@ -12,8 +12,10 @@ from coding_agent.evaluation.systems import (
     SystemOutput,
 )
 from coding_agent.evaluation.task import Task, load_task, load_tasks
+from coding_agent.evaluation.validate import CATEGORIES, validate_all, validate_task
 
 __all__ = [
+    "CATEGORIES",
     "SAFETY_CASES",
     "CaseResult",
     "GradeResult",
@@ -36,4 +38,6 @@ __all__ = [
     "run_case",
     "run_safety_suite",
     "save_results",
+    "validate_all",
+    "validate_task",
 ]

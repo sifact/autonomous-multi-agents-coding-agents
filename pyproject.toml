@@ -32,12 +32,15 @@ packages = ["src/coding_agent"]
 testpaths = ["tests"]
 pythonpath = ["."]  # lets tests import shared fakes as tests.graph.fakes
 timeout = 180
-norecursedirs = ["tests/fixtures/tasks"]  # sample eval tasks hold hidden tests, not suite tests
-markers = ["docker: tests that need a running Docker daemon and the sandbox image"]
+norecursedirs = ["tests/fixtures/tasks", "benchmarks/tasks"]  # sample eval tasks hold hidden tests, not suite tests
+markers = [
+  "docker: tests that need a running Docker daemon and the sandbox image",
+  "benchmark: validates the benchmark task set",
+]
 
 [tool.ruff]
 line-length = 100
-extend-exclude = ["tests/fixtures/tasks"]
+extend-exclude = ["tests/fixtures/tasks", "benchmarks/tasks"]
 
 [tool.ruff.lint]
 extend-select = ["E501"]
