@@ -1,0 +1,12 @@
+2024-05-01 10:00:01 INFO  service started
+2024-05-01 10:00:05 INFO  listening on :8080
+2024-05-01 10:01:12 WARN  slow response from db
+2024-05-01 10:01:13 INFO  retrying
+2024-05-01 10:01:20 ERROR db connection lost
+2024-05-01 10:01:21 INFO  reconnecting
+2024-05-01 10:01:25 INFO  reconnected
+2024-05-01 10:02:00 INFO  heartbeat
+2024-05-01 10:03:00 INFO  heartbeat
+2024-05-01 10:04:00 ERROR disk almost full
+2024-05-01 10:04:01 INFO  cleanup started
+2024-05-01 10:04:09 INFO  cleanup finished
