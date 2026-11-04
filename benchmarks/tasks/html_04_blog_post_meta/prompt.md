@@ -16,7 +16,7 @@ Return a dict with exactly the keys `"title"`, `"date"`, `"author"` and `"tags"`
 - `"title"`: the text of the first `<h1>` inside the post, or `None` if there is none.
   Text means everything inside the element with nested tags removed, HTML entities decoded
   (`&amp;`, `&#39;`), whitespace runs collapsed to one space, surrounding whitespace removed.
-- `"date"`: take the first `<time>` element inside the post that has a `datetime` attribute;
+- `"date"`: take the first `<time>` element inside the post that has a non-empty `datetime` attribute (empty or whitespace-only counts as absent);
   the value is the first 10 characters of that attribute (after stripping whitespace), for
   example `"2024-03-05"` from `"2024-03-05T06:15:00+01:00"`. `None` if there is no such element.
 - `"tags"`: a list with the text of every `<a>` inside the post whose `rel` attribute contains

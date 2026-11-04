@@ -5,6 +5,7 @@ content, regardless of their names. The sample directory `sample/` is in the wor
 
 - Two files are duplicates when their bytes are identical. Same size or same name is not
   enough. Empty files are all duplicates of each other.
+- Hidden files and files inside hidden directories (names starting with `.`) count like any other.
 - Return one group per set of identical files, and only for sets with two or more files.
 - Each file is identified by its path relative to `root`, written with `/` as the separator
   (for example `"docs/readme.txt"`). Directories are not files and never appear.

@@ -16,15 +16,17 @@ class _Parser(HTMLParser):
     def handle_starttag(self, tag, attrs):
         if tag != "a":
             return
+        self._finish()  # an <a> left open is ended by the next <a>
         href = dict(attrs).get("href")
         self.href = None if href is None else href.strip()
         self.buffer = []
 
     def handle_endtag(self, tag):
-        if tag != "a" or self.href is None:
-            return
-        href = self.href
-        self.href = None
+        if tag == "a":
+            self._finish()
+
+    def _finish(self) -> None:
+        href, self.href = self.href, None
         if not href or href.startswith("#") or _SKIP.match(href):
             return
         text = re.sub(r"\s+", " ", "".join(self.buffer)).strip()
@@ -39,4 +41,5 @@ def extract_links(html: str, base_url: str) -> list[dict]:
     parser = _Parser(base_url)
     parser.feed(html)
     parser.close()
+    parser._finish()  # an <a> still open at the end of the document
     return parser.links

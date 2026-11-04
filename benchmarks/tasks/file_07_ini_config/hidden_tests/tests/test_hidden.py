@@ -66,3 +66,18 @@ def test_no_interpolation_and_keys_lowercased(tmp_path):
 def test_missing_file_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         load_config(str(tmp_path / "missing.ini"))
+
+
+def test_other_words_stay_strings(tmp_path):
+    out = cfg(tmp_path, "[s]\na = none\nb = null\nc = y\nd = n\ne = t\nf = f\ng = 1_000\nh = enabled\n")
+    assert out["s"] == {"a": "none", "b": "null", "c": "y", "d": "n", "e": "t", "f": "f",
+                        "g": "1_000", "h": "enabled"}
+
+
+def test_value_that_is_only_a_comment_is_empty_string(tmp_path):
+    assert cfg(tmp_path, "[s]\na = # nothing\nb = ; nothing\n")["s"] == {"a": "", "b": ""}
+
+
+def test_quotes_are_kept_as_part_of_the_string(tmp_path):
+    out = cfg(tmp_path, '[s]\na = "yes"\nb = \'5\'\nc = "x y"\n')
+    assert out["s"] == {"a": '"yes"', "b": "'5'", "c": '"x y"'}

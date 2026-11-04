@@ -68,3 +68,22 @@ def test_no_duplicates_and_empty_dir(tmp_path):
 def test_missing_root(tmp_path):
     with pytest.raises(FileNotFoundError):
         find_duplicates(str(tmp_path / "gone"))
+
+
+def test_large_files_differing_only_at_the_end(tmp_path):
+    a = b"z" * 4000 + b"A"
+    b = b"z" * 4000 + b"B"
+    root = build(tmp_path, {"a.bin": a, "b.bin": b, "c.bin": a})
+    assert find_duplicates(root) == [["a.bin", "c.bin"]]
+
+
+def test_plain_string_order_uppercase_before_lowercase(tmp_path):
+    root = build(tmp_path, {
+        "b.txt": b"s", "C.txt": b"s", "a.txt": b"s", "Z/x": b"q", "a/x": b"q",
+    })
+    assert find_duplicates(root) == [["C.txt", "a.txt", "b.txt"], ["Z/x", "a/x"]]
+
+
+def test_hidden_files_and_directories_are_included(tmp_path):
+    root = build(tmp_path, {".env": b"k", ".git/cfg": b"k", "plain": b"k"})
+    assert find_duplicates(root) == [[".env", ".git/cfg", "plain"]]

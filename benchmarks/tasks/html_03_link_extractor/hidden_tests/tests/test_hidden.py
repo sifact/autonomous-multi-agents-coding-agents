@@ -82,7 +82,7 @@ def test_duplicates_kept_and_document_order():
 def test_base_tag_ignored_and_image_only_text_empty():
     html = (
         '<html><head><base href="http://wrong.example.test/"></head><body>'
-        '<a href="p.html"><img src="i.png" alt="Picture"></a></body></html>'
+        '<a href="p.html" title="Tip"><img src="i.png" alt="Picture" title="Tip"></a></body></html>'
     )
     assert extract_links(html, "http://right.example.test/d/") == [
         {"text": "", "url": "http://right.example.test/d/p.html"}]
@@ -97,3 +97,34 @@ def test_absolute_and_protocol_relative_urls():
 def test_no_links():
     assert links("<p>nothing here</p>") == []
     assert extract_links("", BASE) == []
+
+
+def test_only_a_elements_count():
+    html = ('<head><link rel=stylesheet href="s.css"></head><map><area href="/z"></map>'
+            '<a href="ok">ok</a>')
+    assert extract_links(html, "https://b.example.test/d/") == [
+        {"text": "ok", "url": "https://b.example.test/d/ok"}]
+
+
+def test_other_schemes_kept_and_any_whitespace_stripped():
+    html = (
+        '<a href="ftp://f.example.test/x">f</a><a href="data:text/plain,hi">d</a>'
+        '<a href="\n\t#frag">n</a><a href="\t/t\n">t</a><a href="/r?u=mailto:a@b">r</a>'
+    )
+    assert extract_links(html, "https://b.example.test/d/") == [
+        {"text": "f", "url": "ftp://f.example.test/x"},
+        {"text": "d", "url": "data:text/plain,hi"},
+        {"text": "t", "url": "https://b.example.test/t"},
+        {"text": "r", "url": "https://b.example.test/r?u=mailto:a@b"},
+    ]
+
+
+def test_unclosed_anchor_ends_at_next_anchor_or_end_of_page():
+    base = "https://b.example.test/"
+    html = '<a href="/one">First <b>link</b><a href="/two">Second'
+    assert extract_links(html, base) == [
+        {"text": "First link", "url": "https://b.example.test/one"},
+        {"text": "Second", "url": "https://b.example.test/two"},
+    ]
+    assert extract_links('<p><a href="/last">tail', base) == [
+        {"text": "tail", "url": "https://b.example.test/last"}]

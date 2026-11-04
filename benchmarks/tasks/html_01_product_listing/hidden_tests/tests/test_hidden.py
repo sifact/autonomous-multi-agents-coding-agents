@@ -105,3 +105,29 @@ def test_outside_elements_ignored_and_empty_pages():
 def test_price_is_float_type():
     (item,) = parse_products(page('<li class="product"><b class="name">X</b><b class="price">$7</b></li>'))
     assert type(item["price"]) is float
+
+
+def test_name_and_price_nested_in_wrappers_and_tab_separated_classes():
+    html = page(
+        '<li class="item\tproduct\nfeatured"><div class="info"><div><span class="name">Deep</span></div>'
+        '<p><span class="price">$3</span></p></div></li>'
+    )
+    assert parse_products(html) == [{"name": "Deep", "price": 3.0}]
+
+
+def test_every_dollar_sign_is_removed():
+    html = page(
+        '<li class="product"><b class="name">A</b><b class="price">12.50$</b></li>'
+        '<li class="product"><b class="name">B</b><b class="price">US$ 1$2</b></li>'
+        '<li class="product"><b class="name">C</b><b class="price">$$5</b></li>'
+    )
+    assert parse_products(html) == [
+        {"name": "A", "price": 12.5},
+        {"name": "B", "price": None},
+        {"name": "C", "price": 5.0},
+    ]
+
+
+def test_entities_are_decoded_only_once():
+    html = page('<li class="product"><b class="name">&amp;amp; &lt;b&gt;</b></li>')
+    assert parse_products(html) == [{"name": "&amp; <b>", "price": None}]

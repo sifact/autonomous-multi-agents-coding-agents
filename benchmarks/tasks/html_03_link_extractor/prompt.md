@@ -12,6 +12,11 @@ Rules:
 
 - Consider every `<a>` element that has an `href` attribute, in document order. Duplicate
   links are all kept.
+- An `<a>` that is never closed ends at the next `<a>` start tag or at the end of the page and
+  is still a link (its text is what it contains up to that point).
+- Only `<a>` elements count: `href` on `<link>`, `<area>` or anything else is not a link.
+  Other schemes (`ftp:`, `data:`, `https:`) are kept; only the three prefixes below are skipped,
+  and only at the very start of the stripped `href` (`/r?u=mailto:x` is kept).
 - Skip the link when its `href`, stripped of surrounding whitespace, is empty, starts with `#`,
   or starts with `mailto:`, `tel:` or `javascript:` (any letter case).
 - `"url"` is the stripped `href` (HTML entities such as `&amp;` decoded) resolved against

@@ -24,7 +24,8 @@ class _Parser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         attr = dict(attrs)
-        if tag == "meta" and not self.author_seen and (attr.get("name") or "").strip().lower() == "author":
+        is_author = (attr.get("name") or "").strip().lower() == "author"
+        if tag == "meta" and not self.author_seen and is_author:
             self.author_seen = True
             self.author = (attr.get("content") or "").strip() or None
         if tag == "article":
@@ -37,7 +38,7 @@ class _Parser(HTMLParser):
             return
         if tag == "h1" and self.title is None:
             self.capture, self.buffer = "title", []
-        elif tag == "time" and self.date is None and attr.get("datetime"):
+        elif tag == "time" and self.date is None and (attr.get("datetime") or "").strip():
             self.date = attr["datetime"].strip()[:10]
         elif tag == "a" and "tag" in (attr.get("rel") or "").split():
             self.capture, self.buffer = "tag", []
@@ -64,4 +65,9 @@ def parse_post(html: str) -> dict:
     parser = _Parser()
     parser.feed(html)
     parser.close()
-    return {"title": parser.title, "date": parser.date, "author": parser.author, "tags": parser.tags}
+    return {
+        "title": parser.title,
+        "date": parser.date,
+        "author": parser.author,
+        "tags": parser.tags,
+    }

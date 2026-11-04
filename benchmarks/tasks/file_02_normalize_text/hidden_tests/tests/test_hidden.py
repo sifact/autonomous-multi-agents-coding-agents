@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from solution import normalize_file
@@ -11,9 +13,9 @@ def run(tmp_path, raw: bytes):
 
 
 def test_fixture_is_clean():
-    before = open("sample.txt", "rb").read()
+    before = Path("sample.txt").read_bytes()
     assert normalize_file("sample.txt") is False
-    assert open("sample.txt", "rb").read() == before
+    assert Path("sample.txt").read_bytes() == before
 
 
 def test_crlf_to_lf(tmp_path):

@@ -75,3 +75,8 @@ def test_no_table_and_empty_table():
     assert parse_table("<p>nothing</p>") == []
     assert parse_table("") == []
     assert parse_table("<table></table>") == []
+
+
+def test_first_table_is_used_even_if_it_is_empty():
+    html = "<table></table><table><tr><td>second</td></tr></table>"
+    assert parse_table(html) == []

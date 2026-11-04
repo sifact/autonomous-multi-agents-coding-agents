@@ -1,5 +1,6 @@
 import csv
 import os
+from pathlib import Path
 
 import pytest
 
@@ -34,8 +35,8 @@ def test_exact_raw_text_of_chunks(tmp_path):
     src = write(tmp_path, "id,note\n1,a\n2,\"x, y\"\n3,c\n")
     out = str(tmp_path / "o")
     p1, p2 = split_csv(src, 2, out)
-    assert open(p1, "rb").read() == b'id,note\n1,a\n2,"x, y"\n'
-    assert open(p2, "rb").read() == b"id,note\n3,c\n"
+    assert Path(p1).read_bytes() == b'id,note\n1,a\n2,"x, y"\n'
+    assert Path(p2).read_bytes() == b"id,note\n3,c\n"
 
 
 def test_exact_multiple_has_no_empty_trailing_chunk(tmp_path):
@@ -99,3 +100,16 @@ def test_bad_chunk_size_and_missing_file(tmp_path):
             split_csv(src, bad, str(tmp_path / "o"))
     with pytest.raises(FileNotFoundError):
         split_csv(str(tmp_path / "nope.csv"), 2, str(tmp_path / "o"))
+
+
+def test_returned_paths_are_out_dir_joined_with_file_name(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "in.csv").write_text("a\n1\n")
+    assert split_csv("in.csv", 5, "out") == [os.path.join("out", "in_part001.csv")]
+    assert split_csv("in.csv", 5, "./o2") == [os.path.join("./o2", "in_part001.csv")]
+
+
+def test_crlf_input_and_crlf_inside_a_quoted_field(tmp_path):
+    src = write(tmp_path, 'id,t\r\n1,"a\r\nb"\r\n2,c\r\n')
+    (p1,) = split_csv(src, 5, str(tmp_path / "o"))
+    assert rows_of(p1) == [["id", "t"], ["1", "a\r\nb"], ["2", "c"]]

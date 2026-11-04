@@ -107,3 +107,29 @@ def test_no_article_still_reads_author():
     html = '<head><meta name="author" content="Zed"></head><body><h1>Hi</h1><time datetime="2024-01-01">x</time></body>'
     assert parse_post(html) == {"title": None, "date": None, "author": "Zed", "tags": []}
     assert parse_post("") == {"title": None, "date": None, "author": None, "tags": []}
+
+
+def test_date_is_the_first_ten_characters_of_the_attribute():
+    def date(value):
+        return parse_post(f'<article><time datetime="{value}">x</time></article>')["date"]
+
+    assert date("2024-03-05 06:15:00") == "2024-03-05"
+    assert date("2024-03") == "2024-03"
+    assert date("20240305T1200") == "20240305T1"
+
+
+def test_empty_datetime_counts_as_absent():
+    html = post('<time datetime="">a</time><time datetime="  ">b</time>'
+                '<time datetime="2021-05-06">c</time>')
+    assert parse_post(html)["date"] == "2021-05-06"
+    assert parse_post(post('<time datetime="">a</time>'))["date"] is None
+
+
+def test_author_meta_is_found_anywhere_in_the_page():
+    html = '<body><article></article><meta name="author" content="B"></body>'
+    assert parse_post(html)["author"] == "B"
+
+
+def test_first_author_meta_decides_even_if_its_content_is_empty():
+    head = '<meta name="author" content=""><meta name="author" content="Later">'
+    assert parse_post(post("", head))["author"] is None

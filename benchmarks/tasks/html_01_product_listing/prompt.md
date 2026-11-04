@@ -10,15 +10,17 @@ exact text of the sample.
 Rules:
 
 - A *product* is an `<li>` element whose `class` attribute contains the word `product`
-  (classes are separated by whitespace; `product-list`, `products` and `sponsor` do not count).
+  (classes are separated by any whitespace, including tabs and line breaks; `product-list`, `products` and `sponsor` do not count).
   Elements outside such an `<li>` are ignored, even if they have a `name` or `price` class.
 - The product's *name* is the text of the first element inside it whose class contains the
   word `name`. The *price* is the text of the first element inside it whose class contains
   the word `price` (`price-note` does not count). The text of an element includes the text of
-  everything nested in it (tags removed), HTML entities decoded (`&amp;`, `&#39;`, `&#36;`),
+  everything nested in it (tags removed, however deeply), HTML entities decoded once
+  (`&amp;amp;` gives `&amp;`; also `&#39;`, `&#36;`),
   whitespace runs collapsed to a single space, and surrounding whitespace removed.
+- The name and price elements may sit at any depth inside the `<li>`, not only directly in it.
 - A product without a name element is skipped.
-- Price value: remove every `$` and `,` from the price text, strip whitespace, convert with
+- Price value: remove every `$` (wherever it appears, e.g. `12.50$`) and every `,` from the price text, strip whitespace, convert with
   `float()`. If the product has no price element, or the text still is not a number
   (for example `Sold out`), the price is `None`.
 - Return one dict per product, `{"name": str, "price": float | None}`, in document order.

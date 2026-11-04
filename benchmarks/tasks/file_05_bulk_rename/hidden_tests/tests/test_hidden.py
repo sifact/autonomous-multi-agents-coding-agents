@@ -92,3 +92,12 @@ def test_unchanged_names_are_skipped(tmp_path):
 def test_missing_directory(tmp_path):
     with pytest.raises(FileNotFoundError):
         rename_files(str(tmp_path / "gone"), "a", "b")
+
+
+def test_old_name_stays_taken_when_its_file_is_renamed_away(tmp_path):
+    d = make(tmp_path, {"x.txt": "1", "xx.txt": "2"})
+    # x.txt -> ".txt"; xx.txt -> "x.txt", which is still taken at the start of the run
+    assert rename_files(d, r"^x", "", apply=True) == [("x.txt", ".txt"), ("xx.txt", "x_1.txt")]
+    assert listing(tmp_path) == [".txt", "x_1.txt"]
+    assert (tmp_path / ".txt").read_text() == "1"
+    assert (tmp_path / "x_1.txt").read_text() == "2"

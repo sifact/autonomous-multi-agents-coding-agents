@@ -96,3 +96,28 @@ def test_negative_context_rejected(tmp_path):
         run(tmp_path, LOG, "ERROR", -1, 0)
     with pytest.raises(ValueError):
         run(tmp_path, LOG, "ERROR", 0, -1)
+
+
+def test_lines_split_only_at_lf(tmp_path):
+    p = tmp_path / "x.log"
+    p.write_bytes("a\x0cb c\x85d\nZ\n".encode("utf-8"))
+    assert grep_context(str(p), "Z") == ["2:Z"]
+    assert grep_context(str(p), "b c") == ["1:a\x0cb c\x85d"]
+
+
+def test_crlf_lines_keep_their_carriage_return(tmp_path):
+    p = tmp_path / "x.log"
+    p.write_bytes(b"a\r\nHIT\r\nb\r\n")
+    assert grep_context(str(p), "HIT", 1, 0) == ["1-a\r", "2:HIT\r"]
+
+
+def test_whitespace_in_displayed_lines_is_preserved(tmp_path):
+    p = tmp_path / "x.log"
+    p.write_bytes(b"  indented  \nx\n")
+    assert grep_context(str(p), r"^\s+\w+\s+$") == ["1:  indented  "]
+
+
+def test_context_defaults_to_zero(tmp_path):
+    p = tmp_path / "x.log"
+    p.write_bytes(b"a\nHIT\nb\n")
+    assert grep_context(str(p), "HIT") == ["2:HIT"]
