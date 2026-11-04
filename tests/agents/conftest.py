@@ -7,7 +7,10 @@ from coding_agent.sandbox import ExecResult
 
 
 def plan_json(n_steps: int = 2) -> str:
-    steps = [{"id": i, "description": f"step {i}", "acceptance": f"check {i}"} for i in range(1, n_steps + 1)]
+    steps = [
+        {"id": i, "description": f"step {i}", "acceptance": f"check {i}"}
+        for i in range(1, n_steps + 1)
+    ]
     return "```json\n" + json.dumps({"steps": steps, "criteria": ["prints ok"]}) + "\n```"
 
 
@@ -15,7 +18,9 @@ def ok_exec(stdout: str = "ok\n") -> ExecResult:
     return ExecResult(0, stdout, "", False, False, 0.1)
 
 
-def failed_exec(stderr: str = "Traceback (most recent call last):\nZeroDivisionError: division by zero\n") -> ExecResult:
+def failed_exec(
+    stderr: str = "Traceback (most recent call last):\nZeroDivisionError: division by zero\n",
+) -> ExecResult:
     return ExecResult(1, "", stderr, False, False, 0.1)
 
 

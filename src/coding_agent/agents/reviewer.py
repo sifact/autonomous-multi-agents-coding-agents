@@ -21,7 +21,8 @@ from coding_agent.sandbox import ExecResult
 
 
 def _run_succeeded(r: ExecResult | None) -> bool:
-    return r is not None and r.exit_code == 0 and not (r.timed_out or r.oom_killed or r.disk_exceeded)
+    abnormal = r is not None and (r.timed_out or r.oom_killed or r.disk_exceeded)
+    return r is not None and r.exit_code == 0 and not abnormal
 
 
 def enforce_pass_rule(verdict: Verdict, last_exec: ExecResult | None) -> Verdict:
@@ -72,7 +73,8 @@ def make_reviewer(
         user = REVIEWER_USER.format(
             command=" ".join(command) if command else "(none)",
             command_meaning=describe_command(command),
-            task=task_text(state["task"], state["fixtures"]), criteria=format_list(state["criteria"]),
+            task=task_text(state["task"], state["fixtures"]),
+            criteria=format_list(state["criteria"]),
             files=format_files(state["files"]), exec_summary=exec_summary(last),
             stdout=stdout, stderr=stderr, flags=_flags_text(version),
             repairs=state["repairs"], replans=state["replans"],
@@ -80,12 +82,16 @@ def make_reviewer(
         verdict, usage, error = invoke_json(model, REVIEWER_SYSTEM, user, Verdict, prefer="last")
         if verdict is None:
             # Malformed twice: stop cleanly with a reason instead of crashing.
-            verdict = Verdict(action="stop", reason=f"Reviewer gave malformed output twice ({error}).")
+            verdict = Verdict(
+                action="stop", reason=f"Reviewer gave malformed output twice ({error})."
+            )
         verdict = enforce_pass_rule(verdict, last)
         return {
             "verdict": verdict,
             **bump_visit(state),
-            "events": [event("reviewer", usage, model=name, action=verdict.action, reason=verdict.reason)],
+            "events": [event(
+                "reviewer", usage, model=name, action=verdict.action, reason=verdict.reason
+            )],
         }
 
     return reviewer

@@ -25,8 +25,10 @@ from coding_agent.sandbox import ExecResult
 from .fakes import CannedSandbox, code, layout, plan, scripted_router, verdict
 
 OK = ExecResult(0, "ok\n", "", False, False, 0.1)
-FAIL = ExecResult(1, "", "Traceback (most recent call last):\n  File \"main.py\"\nKeyError: 'total'\n",
-                  False, False, 0.1)
+FAIL = ExecResult(
+    1, "", "Traceback (most recent call last):\n  File \"main.py\"\nKeyError: 'total'\n",
+    False, False, 0.1,
+)
 
 
 @pytest.fixture
@@ -47,7 +49,8 @@ def test_each_role_script_is_consumed_independently(settings):
     tracker = UsageTracker()
     router, llms = scripted_router(
         settings, tracker,
-        planner=[plan()], architect=[layout()], coder=[code("print('ok')")], reviewer=[verdict("pass")],
+        planner=[plan()], architect=[layout()], coder=[code("print('ok')")],
+        reviewer=[verdict("pass")],
     )
     report = run_task(build_graph(router, CannedSandbox(OK), settings), "Print ok")
     assert report.success and report.repairs == 0 and report.files == {"main.py": "print('ok')\n"}
@@ -103,8 +106,8 @@ def test_failure_explanation_names_cause_and_last_error_line(settings):
 def test_failure_explanation_uses_stdout_when_stderr_empty(settings):
     """pytest reports failures on stdout."""
     s = initial_state("t")
-    s["last_exec"] = ExecResult(1, "....F\nFAILED test_main.py::test_x - assert 1 == 2\n1 failed\n", "",
-                                False, False, 1.0)
+    out = "....F\nFAILED test_main.py::test_x - assert 1 == 2\n1 failed\n"
+    s["last_exec"] = ExecResult(1, out, "", False, False, 1.0)
     s["verdict"] = Verdict(action="stop", reason="hopeless")
     report = build_report(s, settings)
     assert "Reviewer stopped the run: hopeless" in report.explanation

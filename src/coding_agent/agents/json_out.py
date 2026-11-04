@@ -86,7 +86,7 @@ def invoke_json[T: BaseModel](
     except ParseError:
         pass
     retry = model.invoke(system, f"{user}\n\n{JSON_RETRY_REMINDER.format(schema=schema.__name__)}")
-    usage = Usage(usage.tokens_in + retry.usage.tokens_in, usage.tokens_out + retry.usage.tokens_out)
+    usage = usage + retry.usage
     try:
         return parse_json(retry.text, schema, prefer), usage, ""
     except ParseError as exc:

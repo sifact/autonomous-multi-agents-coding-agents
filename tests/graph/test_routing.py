@@ -18,8 +18,10 @@ S = Settings()  # max_repairs=3, max_replans=2, step_budget=40
 def st(action, repairs=0, replans=0, visits=0):
     s = initial_state("t")
     if action is not None:
-        v = Verdict(action=action, reason="r") if action != "weird" else SimpleNamespace(action="weird", reason="r")
-        s["verdict"] = v
+        if action == "weird":
+            s["verdict"] = SimpleNamespace(action="weird", reason="r")
+        else:
+            s["verdict"] = Verdict(action=action, reason="r")
     s.update(repairs=repairs, replans=replans, visits=visits)
     return s
 

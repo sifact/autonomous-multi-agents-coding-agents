@@ -38,7 +38,9 @@ class DockerSandbox:
     def __init__(self, image: str) -> None:
         self.image = image
 
-    def _docker_args(self, name: str, workspace: Path, limits: Limits, command: list[str]) -> list[str]:
+    def _docker_args(
+        self, name: str, workspace: Path, limits: Limits, command: list[str]
+    ) -> list[str]:
         args = [
             "docker", "run", "--name", name,
             "--user", "1000:1000",
@@ -80,7 +82,9 @@ class DockerSandbox:
             return insp.stdout.strip() == "true"
         finally:
             # Always remove, even if kill/inspect raised, so no container leaks.
-            subprocess.run(["docker", "rm", "-f", name], capture_output=True, timeout=30, check=False)
+            subprocess.run(
+                ["docker", "rm", "-f", name], capture_output=True, timeout=30, check=False
+            )
 
     def run(self, workspace: Path, command: list[str], limits: Limits | None = None) -> ExecResult:
         limits = limits or Limits()
@@ -110,8 +114,10 @@ class DockerSandbox:
         except subprocess.TimeoutExpired as exc:
             timed_out = True
             code = 124
-            out = exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-            err = exc.stderr.decode(errors="replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+            out, err = (
+                s.decode(errors="replace") if isinstance(s, bytes) else (s or "")
+                for s in (exc.stdout, exc.stderr)
+            )
         finally:
             stop.set()
             watcher.join()

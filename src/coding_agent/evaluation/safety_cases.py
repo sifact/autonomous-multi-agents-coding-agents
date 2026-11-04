@@ -164,6 +164,7 @@ SAFETY_CASES: list[SafetyCase] = [
         post_check=_disk_bounded,
     ),
     SafetyCase(
-        "read_host_path", _READ_HOST, lambda r: "ABSENT" in r.stdout and "HOST_VISIBLE" not in r.stdout,
+        "read_host_path", _READ_HOST,
+        lambda r: "ABSENT" in r.stdout and "HOST_VISIBLE" not in r.stdout,
     ),
 ]

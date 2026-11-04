@@ -38,3 +38,6 @@ markers = ["docker: tests that need a running Docker daemon and the sandbox imag
 [tool.ruff]
 line-length = 100
 extend-exclude = ["tests/fixtures/tasks"]
+
+[tool.ruff.lint]
+extend-select = ["E501"]

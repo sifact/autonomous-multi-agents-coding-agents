@@ -64,10 +64,10 @@ def _assert_told(prompt: str):
 
 def test_single_shot_and_loop_prompts_contain_fixture_preview():
     llm = FakeLLM(["x"])
-    SingleShot(llm, SeeingSandbox()).solve(SUM_CSV)
+    SingleShot(llm, SeeingSandbox(), model_name="m").solve(SUM_CSV)
     _assert_told(llm.calls[0][1])
     llm = FakeLLM(["x"] * 4)
-    SingleAgentLoop(llm, SeeingSandbox(), Settings()).solve(SUM_CSV)
+    SingleAgentLoop(llm, SeeingSandbox(), Settings(), model_name="m").solve(SUM_CSV)
     _assert_told(llm.calls[0][1])
 
 
@@ -76,7 +76,7 @@ def test_preview_is_capped():
     from dataclasses import replace
     big = replace(SUM_CSV, fixtures={"big.txt": "\n".join(f"line{i}" for i in range(500))})
     llm = FakeLLM(["x"])
-    SingleShot(llm, SeeingSandbox()).solve(big)
+    SingleShot(llm, SeeingSandbox(), model_name="m").solve(big)
     assert "line19" in llm.calls[0][1] and "line25" not in llm.calls[0][1]
 
 
@@ -112,8 +112,10 @@ def test_debugger_sees_fixtures():
 
 @pytest.mark.docker
 def test_real_sandbox_program_reads_fixture():
-    _, result = execute_files({"main.py": READER}, DockerSandbox(IMAGE), Settings(sandbox_image=IMAGE),
-                              fixtures=SUM_CSV.fixtures)
+    settings = Settings(sandbox_image=IMAGE)
+    _, result = execute_files(
+        {"main.py": READER}, DockerSandbox(IMAGE), settings, fixtures=SUM_CSV.fixtures
+    )
     assert result.exit_code == 0 and result.stdout.strip() == "1600.0"
 
 

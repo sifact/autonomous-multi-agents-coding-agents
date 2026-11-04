@@ -104,7 +104,10 @@ def test_container_can_write_into_nested_dir_made_by_write_files(sandbox, worksp
 def test_timeout_kills_container_and_leaves_no_orphan(sandbox, workspace):
     r = sandbox.run(workspace, ["sleep", "60"], Limits(timeout_s=2))
     assert r.timed_out
-    ps = subprocess.run(["docker", "ps", "-aq", "--filter", "name=coding-agent-"], capture_output=True, text=True, check=False)
+    ps = subprocess.run(
+        ["docker", "ps", "-aq", "--filter", "name=coding-agent-"],
+        capture_output=True, text=True, check=False,
+    )
     assert ps.stdout.strip() == ""
 
 

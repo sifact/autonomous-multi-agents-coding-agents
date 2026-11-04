@@ -8,7 +8,9 @@ from .conftest import failed_exec, plan_json
 def test_planner_parses_plan_and_criteria(state):
     llm = FakeLLM(["Here is my plan:\n" + plan_json(3)])
     update = make_planner(llm)(state)
-    assert update["plan"] == [Step(id=i, description=f"step {i}", acceptance=f"check {i}") for i in (1, 2, 3)]
+    assert update["plan"] == [
+        Step(id=i, description=f"step {i}", acceptance=f"check {i}") for i in (1, 2, 3)
+    ]
     assert update["criteria"] == ["prints ok"]
     assert update["visits"] == state["visits"] + 1
     assert [e["node"] for e in update["events"]] == ["planner"]
@@ -41,7 +43,9 @@ def test_planner_falls_back_after_two_malformed_replies(state):
 
 
 def test_architect_parses_layout(state):
-    llm = FakeLLM(['{"files": [{"path": "main.py", "purpose": "entry"}, {"path": "test_main.py"}]}'])
+    llm = FakeLLM([
+        '{"files": [{"path": "main.py", "purpose": "entry"}, {"path": "test_main.py"}]}'
+    ])
     update = make_architect(llm)(state)
     assert update["layout"] == ["main.py: entry", "test_main.py"]
     assert update["visits"] == state["visits"] + 1

@@ -47,7 +47,11 @@ def _dotted(node: ast.AST) -> str:
 
 def _is_absolute_path_arg(call: ast.Call) -> bool:
     arg = call.args[0] if call.args else None
-    return isinstance(arg, ast.Constant) and isinstance(arg.value, str) and arg.value.startswith("/")
+    return (
+        isinstance(arg, ast.Constant)
+        and isinstance(arg.value, str)
+        and arg.value.startswith("/")
+    )
 
 
 def _scan_ast(tree: ast.AST) -> list[PolicyFlag]:

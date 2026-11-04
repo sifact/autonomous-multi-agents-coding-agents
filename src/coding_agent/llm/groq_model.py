@@ -84,13 +84,16 @@ def _langchain_call(model: str, api_key: str, system: str, user: str) -> LLMResp
     from langchain_groq import ChatGroq
 
     # max_retries=0: retries are ours, so the limiter and backoff stay in control.
-    chat = ChatGroq(model=model, api_key=api_key, temperature=0, max_retries=0)  # type: ignore[arg-type]
+    chat = ChatGroq(  # type: ignore[arg-type]
+        model=model, api_key=api_key, temperature=0, max_retries=0
+    )
     try:
         msg = chat.invoke([("system", system), ("human", user)])
     except groq.RateLimitError as exc:
         raise RateLimited(_retry_after(exc)) from exc
     meta = getattr(msg, "usage_metadata", None) or {}
-    return LLMResponse(_content_text(msg.content), Usage(meta.get("input_tokens", 0), meta.get("output_tokens", 0)))
+    usage = Usage(meta.get("input_tokens", 0), meta.get("output_tokens", 0))
+    return LLMResponse(_content_text(msg.content), usage)
 
 
 class GroqChatModel:

@@ -72,7 +72,8 @@ class AgentState(TypedDict):
 def initial_state(task: str, fixtures: dict[str, str] | None = None) -> AgentState:
     """Fresh state: counters at zero, containers empty and unshared."""
     return AgentState(
-        task=task, fixtures=dict(fixtures or {}), plan=[], criteria=[], layout=[], files={}, code_versions=[],
+        task=task, fixtures=dict(fixtures or {}), plan=[], criteria=[], layout=[], files={},
+        code_versions=[],
         last_exec=None, verdict=None, repairs=0, replans=0, visits=0,
         events=[], final=None,
     )

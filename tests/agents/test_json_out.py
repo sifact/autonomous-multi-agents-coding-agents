@@ -34,7 +34,9 @@ def test_verdict_normalised():
     assert parse_json('{"action": " FIX "}', Verdict).action == "fix"
 
 
-@pytest.mark.parametrize("text", ["", "no json here", '{"name": "a"}', '{"action": "maybe"}', "[1, 2]"])
+@pytest.mark.parametrize(
+    "text", ["", "no json here", '{"name": "a"}', '{"action": "maybe"}', "[1, 2]"]
+)
 def test_raises_parse_error(text):
     with pytest.raises(ParseError):
         parse_json(text, Thing)

@@ -52,7 +52,7 @@ class FakeSystem:
     def solve(self, task):
         self.seen.append(task.id)
         step = self.steps.pop(0)
-        if isinstance(step, Exception):
+        if isinstance(step, BaseException):
             raise step
         return step
 
@@ -79,7 +79,8 @@ def test_first_try_graded_from_first_files_not_final(tmp_path):
 
 def test_identical_first_and_final_files_graded_once(tmp_path):
     grader = MarkerGrader()
-    run_benchmark(TASK_LIST[:1], FakeSystem(output({"solution.py": "GOOD"})), grader, out_dir=tmp_path)
+    system = FakeSystem(output({"solution.py": "GOOD"}))
+    run_benchmark(TASK_LIST[:1], system, grader, out_dir=tmp_path)
     assert grader.runs == 1
 
 
@@ -123,17 +124,19 @@ def test_seed_is_applied_before_each_run(tmp_path):
             return super().solve(task)
 
     ok = output({"solution.py": "GOOD"})
-    run(Probe(ok, ok), tmp_path, seed=7)
-    random.seed(7)
-    expected = random.random()
-    assert draws == [expected, expected]
+    run(Probe(ok, ok, ok, ok), tmp_path, seed=7, repeats=2)
+    expected = []
+    for seed in (7, 7, 8, 8):  # seed + repeat index
+        random.seed(seed)
+        expected.append(random.random())
+    assert draws == expected
 
 
 def test_max_rpm_spaces_run_starts(tmp_path, monkeypatch):
     sleeps = []
     monkeypatch.setattr(runner_mod, "_sleep", sleeps.append)
     ok = output({"solution.py": "GOOD"})
-    run(FakeSystem(ok, ok), tmp_path, max_rpm=30)
+    run(FakeSystem(ok, ok), tmp_path, max_runs_per_min=30)
     assert len(sleeps) == 1 and 0 < sleeps[0] <= 2.0  # 60/30 s minus elapsed
 
 
@@ -146,18 +149,83 @@ def test_result_json_round_trips(tmp_path):
     assert data["system"] == "fake" and data["seed"] == 3 and data["repeats"] == 1
     assert data["models"] == {"cheap": "c-model", "strong": "s-model"}
     assert data["settings"]["max_repairs"] == 3
-    assert "git_sha" in data and "timestamp" in data
+    assert "git_sha" in data and "timestamp" in data and isinstance(data["git_dirty"], bool | None)
+    assert data["settings"]["max_repairs"] == 3 and "budget_note" in data
+    assert "retry budget" in data["budget_note"]
+    assert "matched_budget_pass_rate" in data["budget_note"]
     assert data["task_ids"] == ["fix_mean", "sum_csv"]
     assert [RunRecord(**r) for r in data["records"]] == records
     assert data["records"][0]["cost_usd"] is None  # unpriced stays null, not 0
     m = data["metrics"]
-    assert m["n"] == 2 and m["mean_cost_usd"] is None and m["cost_known"] is False
+    assert m["n"] == 2 and m["n_errors"] == 0 and m["total_tokens_all"] == 30
+    assert m["mean_cost_usd"] is None and m["cost_known"] is False
     assert m["cost_known_count"] == 0 and m["runtime_errors_fixed_pct"] is None
 
 
+def test_budget_files_graded_separately_and_reused(tmp_path):
+    grader = MarkerGrader()
+    out = output({"solution.py": "GOOD"}, first_files={"solution.py": "bad"},
+                 budget_files={"solution.py": "bad"})
+    (r,) = run_benchmark(TASK_LIST[:1], FakeSystem(out), grader, out_dir=tmp_path)
+    assert (r.first_try_pass, r.matched_budget_pass, r.final_pass) == (False, False, True)
+    assert grader.runs == 2  # budget files equal first_files: graded once
+    third = output({"solution.py": "GOOD"}, first_files={"solution.py": "bad"},
+                   budget_files={"solution.py": "GOOD"})
+    grader = MarkerGrader()
+    (r,) = run_benchmark(TASK_LIST[:1], FakeSystem(third), grader, out_dir=tmp_path)
+    assert r.matched_budget_pass and grader.runs == 2  # equals final: reused
+
+
+def test_fixed_and_passed_and_repeat_on_record(tmp_path):
+    a = output({"solution.py": "GOOD"}, had_runtime_error=True, fixed=True)
+    b = output({"solution.py": "bad"}, had_runtime_error=True, fixed=True)
+    r1, r2 = run(FakeSystem(a, b), tmp_path, tasks=TASK_LIST[:1], repeats=2)
+    assert (r1.fixed_and_passed, r1.repeat) == (True, 0)
+    assert (r2.fixed_and_passed, r2.repeat) == (False, 1)
+
+
+def test_crash_record_keeps_partial_usage(tmp_path):
+    exc = RuntimeError("boom")
+    exc.partial_usage = Usage(70, 30)
+    exc.partial_cost_usd = None
+    exc.partial_wall_s = 4.5
+    (r,) = run(FakeSystem(exc), tmp_path, tasks=TASK_LIST[:1])
+    assert (r.tokens_in, r.tokens_out, r.wall_s, r.attempts) == (70, 30, 4.5, 0)
+    assert r.error and r.cost_usd is None
+    data = json.loads(next(tmp_path.glob("fake-*.json")).read_text())
+    assert data["metrics"]["n_errors"] == 1 and data["metrics"]["total_tokens_all"] == 100
+    assert data["metrics"]["mean_tokens"] is None
+
+
+def test_keyboard_interrupt_still_saves_results(tmp_path):
+    ok = output({"solution.py": "GOOD"})
+    with pytest.raises(KeyboardInterrupt):
+        system = FakeSystem(ok, KeyboardInterrupt())
+        run_benchmark(TASK_LIST, system, MarkerGrader(), out_dir=tmp_path)
+    saved = json.loads(next(tmp_path.glob("fake-*.json")).read_text())
+    assert len(saved["records"]) == 1
+
+
+def test_result_filenames_are_unique(tmp_path):
+    ok = output({"solution.py": "GOOD"})
+    for _ in range(3):
+        run(FakeSystem(ok), tmp_path, tasks=TASK_LIST[:1])
+    assert len(list(tmp_path.glob("fake-*.json"))) == 3
+
+
+def test_default_out_dir_is_repo_root_not_cwd():
+    assert runner_mod.DEFAULT_OUT_DIR.is_absolute()
+    assert runner_mod.DEFAULT_OUT_DIR == runner_mod.REPO_ROOT / "benchmarks" / "results"
+    assert (runner_mod.REPO_ROOT / "pyproject.toml").is_file()
+
+
 def test_git_sha_tolerates_absence(monkeypatch):
-    monkeypatch.setattr(runner_mod.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError()))
+    def no_git(*args, **kwargs):
+        raise FileNotFoundError
+
+    monkeypatch.setattr(runner_mod.subprocess, "run", no_git)
     assert runner_mod.git_sha() is None
+    assert runner_mod.git_dirty() is None
 
 
 @pytest.mark.docker
@@ -174,7 +242,8 @@ def test_first_try_pass_from_first_execution_real_grading(tmp_path):
         "### FILE: main.py\n```python\nimport solution\nprint('ok')\n```\n"
     )
     sandbox = DockerSandbox(IMAGE)
-    system = SingleAgentLoop(FakeLLM([buggy, fixed]), sandbox, settings, model_name="fake")
+    system = SingleAgentLoop(
+        FakeLLM([buggy, fixed]), sandbox, settings, model_name="fake")
     (rec,) = run_benchmark([BY_ID["sum_csv"]], system, sandbox, out_dir=tmp_path)
     assert rec.first_try_pass is False and rec.final_pass is True
     assert rec.had_runtime_error and rec.fixed_within_3 and rec.attempts == 2

@@ -30,12 +30,14 @@ def test_a_one_repair_then_pass(settings):
     state, llms = _run(
         settings,
         planner=[plan()], architect=[layout()], coder=[code("print(1 / 0)")],
-        debugger=[code("print('ok')")], reviewer=[verdict("fix", "division by zero"), verdict("pass")],
+        debugger=[code("print('ok')")],
+        reviewer=[verdict("fix", "division by zero"), verdict("pass")],
     )
     report = state["final"]
     assert report.success, report.explanation
     assert report.repairs == 1 and len(state["code_versions"]) == 2
-    assert state["code_versions"][0]["exit_code"] != 0 and state["code_versions"][1]["exit_code"] == 0
+    first, second = state["code_versions"]
+    assert first["exit_code"] != 0 and second["exit_code"] == 0
     assert report.files == {"main.py": "print('ok')\n"}
     assert "ZeroDivisionError" in llms["debugger"].calls[0][1]  # real traceback fed to the repair
     assert _calls(llms) == {"planner": 1, "architect": 1, "coder": 1, "debugger": 1, "reviewer": 2}
@@ -65,8 +67,10 @@ def test_c_replan_goes_back_to_planner_and_resets_repairs(settings):
     )
     nodes = [e["node"] for e in state["events"]]
     loop = ["coder", "executor", "reviewer"]
-    assert nodes == ["planner", "architect", *loop, *loop, "planner", "architect", *loop, "finalize"]
-    assert [e["action"] for e in state["events"] if e["node"] == "reviewer"] == ["fix", "replan", "pass"]
+    plan_arch = ["planner", "architect"]
+    assert nodes == [*plan_arch, *loop, *loop, *plan_arch, *loop, "finalize"]
+    actions = [e["action"] for e in state["events"] if e["node"] == "reviewer"]
+    assert actions == ["fix", "replan", "pass"]
     assert state["replans"] == 1 and state["repairs"] == 0
     assert state["final"].success and state["final"].repairs == 0
     assert "approach is wrong" in llms["planner"].calls[1][1]

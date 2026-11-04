@@ -212,8 +212,9 @@ def test_max_rpm_must_be_positive(bad):
 def test_shared_limiter_blocks_across_models():
     clock = Clock()
     limiter = RateLimiter(2, clock=clock.time, sleep=clock.sleep)
-    a = GroqChatModel("a", "k", limiter=limiter, call=lambda *x: ok(), sleep=clock.sleep, clock=clock.time)
-    b = GroqChatModel("b", "k", limiter=limiter, call=lambda *x: ok(), sleep=clock.sleep, clock=clock.time)
+    kw = {"limiter": limiter, "call": lambda *x: ok(), "sleep": clock.sleep, "clock": clock.time}
+    a = GroqChatModel("a", "k", **kw)
+    b = GroqChatModel("b", "k", **kw)
     a.invoke("s", "u")
     b.invoke("s", "u")
     assert clock.sleeps == []

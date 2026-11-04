@@ -31,7 +31,8 @@ def make_architect(
 
     def architect(state: AgentState) -> dict[str, Any]:
         user = ARCHITECT_USER.format(
-            task=task_text(state["task"], state["fixtures"]), plan=format_plan(state["plan"]), criteria=format_list(state["criteria"])
+            task=task_text(state["task"], state["fixtures"]),
+            plan=format_plan(state["plan"]), criteria=format_list(state["criteria"]),
         )
         layout, usage, error = invoke_json(model, ARCHITECT_SYSTEM, user, Layout)
         if layout is None:
@@ -42,6 +43,9 @@ def make_architect(
         extra: dict[str, Any] = {"model": name, "files": len(paths), "fallback": layout is None}
         if error:
             extra["error"] = error
-        return {"layout": paths, **bump_visit(state), "events": [event("architect", usage, **extra)]}
+        return {
+            "layout": paths, **bump_visit(state),
+            "events": [event("architect", usage, **extra)],
+        }
 
     return architect

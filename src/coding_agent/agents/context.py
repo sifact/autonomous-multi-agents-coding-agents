@@ -18,7 +18,8 @@ from coding_agent.sandbox import ExecResult, truncate
 
 
 def format_plan(steps: list[Step]) -> str:
-    return "\n".join(f"{s.id}. {s.description} (done when: {s.acceptance})" for s in steps) or "(none)"
+    lines = (f"{s.id}. {s.description} (done when: {s.acceptance})" for s in steps)
+    return "\n".join(lines) or "(none)"
 
 
 def format_list(items: list[str]) -> str:

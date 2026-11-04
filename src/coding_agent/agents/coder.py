@@ -97,8 +97,10 @@ def make_coder(
         if repairing:
             stdout, stderr = exec_streams(state.get("last_exec"))
             user = DEBUGGER_USER.format(
-                task=task_text(state["task"], state["fixtures"]), criteria=format_list(state["criteria"]),
-                files=format_files(state["files"]), exec_summary=exec_summary(state.get("last_exec")),
+                task=task_text(state["task"], state["fixtures"]),
+                criteria=format_list(state["criteria"]),
+                files=format_files(state["files"]),
+                exec_summary=exec_summary(state.get("last_exec")),
                 stdout=stdout, stderr=stderr, reason=verdict.reason or "(none)",
             )
             resp = repairer.invoke(DEBUGGER_SYSTEM, user)

@@ -9,7 +9,7 @@ from coding_agent.evaluation import (
     SystemOutput,
     load_tasks,
 )
-from coding_agent.llm import FakeLLM, ModelRouter, UsageTracker
+from coding_agent.llm import FakeLLM, ModelRouter, ScriptExhaustedError, UsageTracker
 from coding_agent.sandbox import ExecResult
 from tests.graph.fakes import code, layout, plan, scripted_router, verdict
 
@@ -22,6 +22,10 @@ FIX_MEAN = BY_ID["fix_mean"]
 
 def files_reply(body: str, path: str = "main.py") -> str:
     return f"### FILE: {path}\n```python\n{body}\n```\n"
+
+
+def flags(out):
+    return (out.attempts, out.first_try_pass, out.had_runtime_error, out.fixed)
 
 
 def res(exit_code=0, stderr=""):
@@ -65,17 +69,17 @@ def test_single_shot_one_call_never_executes(settings):
 
 
 def test_single_shot_unparseable_reply_gives_no_files():
-    out = SingleShot(FakeLLM(["sorry, no code"]), ForbiddenSandbox()).solve(SUM_CSV)
+    out = SingleShot(FakeLLM(["sorry, no code"]), ForbiddenSandbox(), model_name="m").solve(SUM_CSV)
     assert out.files == {}
 
 
 def test_task_prompt_reaches_model_with_starter_and_fixture_listing():
     llm = FakeLLM([files_reply("x = 1")])
-    SingleShot(llm, ForbiddenSandbox()).solve(FIX_MEAN)
+    SingleShot(llm, ForbiddenSandbox(), model_name="m").solve(FIX_MEAN)
     _, user = llm.calls[0]
     assert "mean" in user and "stats.py" in user  # prompt + starter file
     llm = FakeLLM([files_reply("x = 1")])
-    SingleShot(llm, ForbiddenSandbox()).solve(SUM_CSV)
+    SingleShot(llm, ForbiddenSandbox(), model_name="m").solve(SUM_CSV)
     assert "data.csv" in llm.calls[0][1]
 
 
@@ -85,41 +89,41 @@ def test_task_prompt_reaches_model_with_starter_and_fixture_listing():
 def test_loop_stops_after_first_success(settings):
     llm = FakeLLM([files_reply("print('ok')")])
     sb = ScriptedSandbox(res(0))
-    out = SingleAgentLoop(llm, sb, settings).solve(SUM_CSV)
+    out = SingleAgentLoop(llm, sb, settings, model_name="m").solve(SUM_CSV)
     assert len(llm.calls) == 1 and sb.runs == 1
-    assert (out.attempts, out.first_try_pass, out.had_runtime_error, out.fixed) == (1, True, False, False)
+    assert flags(out) == (1, True, False, False)
 
 
 def test_loop_repairs_with_stderr_then_stops(settings):
     llm = FakeLLM([files_reply("1/0"), files_reply("print('ok')")])
     sb = ScriptedSandbox(res(1, "ZeroDivisionError: division by zero"), res(0))
-    out = SingleAgentLoop(llm, sb, settings).solve(SUM_CSV)
+    out = SingleAgentLoop(llm, sb, settings, model_name="m").solve(SUM_CSV)
     assert len(llm.calls) == 2 and sb.runs == 2
     assert "ZeroDivisionError" in llm.calls[1][1]  # real stderr fed back
-    assert (out.attempts, out.first_try_pass, out.had_runtime_error, out.fixed) == (2, False, True, True)
+    assert flags(out) == (2, False, True, True)
     assert out.first_files == {"main.py": "1/0\n"} and out.files == {"main.py": "print('ok')\n"}
 
 
 def test_loop_stops_after_exactly_three_repairs(settings):
     llm = FakeLLM([files_reply(f"raise ValueError({i})") for i in range(6)])
     sb = ScriptedSandbox(*[res(1, f"ValueError: {i}") for i in range(6)])
-    out = SingleAgentLoop(llm, sb, settings).solve(SUM_CSV)
+    out = SingleAgentLoop(llm, sb, settings, model_name="m").solve(SUM_CSV)
     assert len(llm.calls) == 4 and sb.runs == 4  # 1 generation + 3 repairs
-    assert (out.attempts, out.first_try_pass, out.had_runtime_error, out.fixed) == (4, False, True, False)
+    assert flags(out) == (4, False, True, False)
     assert out.files == {"main.py": "raise ValueError(3)\n"}
 
 
 def test_loop_stderr_is_truncated(settings):
     llm = FakeLLM([files_reply("x"), files_reply("y")])
     sb = ScriptedSandbox(res(1, "E" * 100_000), res(0))
-    SingleAgentLoop(llm, sb, settings).solve(SUM_CSV)
+    SingleAgentLoop(llm, sb, settings, model_name="m").solve(SUM_CSV)
     assert len(llm.calls[1][1]) < 30_000
 
 
 def test_loop_empty_reply_is_fed_back_not_crashed(settings):
     llm = FakeLLM(["no files here", files_reply("print('ok')")])
     sb = ScriptedSandbox(res(0))  # only the second attempt reaches the sandbox
-    out = SingleAgentLoop(llm, sb, settings).solve(SUM_CSV)
+    out = SingleAgentLoop(llm, sb, settings, model_name="m").solve(SUM_CSV)
     assert out.attempts == 2 and out.had_runtime_error and out.fixed
     assert "no files" in llm.calls[1][1].lower()
 
@@ -163,7 +167,7 @@ def test_graph_system_repair_run_flags(settings):
         "debugger": [code("print('ok')")], "reviewer": [verdict("fix"), verdict("pass")],
     }
     out = _graph_system(settings, sb, trackers, scripts).solve(SUM_CSV)
-    assert (out.attempts, out.first_try_pass, out.had_runtime_error, out.fixed) == (2, False, True, True)
+    assert flags(out) == (2, False, True, True)
     assert out.first_files == {"main.py": "1/0\n"} and out.files == {"main.py": "print('ok')\n"}
 
 
@@ -172,10 +176,111 @@ def test_describe_lists_models_and_settings(settings):
                     ForbiddenSandbox(), settings).describe()
     assert d["models"] == {"cheap": settings.model_cheap, "strong": settings.model_strong}
     assert d["settings"]["max_repairs"] == settings.max_repairs
-    assert SingleAgentLoop(FakeLLM([]), ForbiddenSandbox(), settings, model_name="x").describe()["models"] == {"model": "x"}
+    loop = SingleAgentLoop(FakeLLM([]), ForbiddenSandbox(), settings, model_name="x")
+    assert loop.describe()["models"] == {"model": "x"}
 
 
 def test_system_output_defaults():
     from coding_agent.llm import Usage
     out = SystemOutput({}, 1, None, False, False, Usage(0, 0), None, 0.0)
     assert out.error is None and out.first_files is None
+
+
+# --- partial usage on crash -------------------------------------------------
+
+
+def test_single_shot_crash_carries_zero_partial_usage():
+    with pytest.raises(ScriptExhaustedError) as ei:
+        SingleShot(FakeLLM([]), ForbiddenSandbox(), model_name="m").solve(SUM_CSV)
+    assert ei.value.partial_usage.total == 0 and ei.value.partial_wall_s >= 0
+
+
+def test_loop_crash_carries_tokens_spent_so_far(settings):
+    llm = FakeLLM([files_reply("1/0")])  # second call (the repair) exhausts the script
+    sb = ScriptedSandbox(res(1, "boom"))
+    with pytest.raises(ScriptExhaustedError) as ei:
+        SingleAgentLoop(llm, sb, settings, model_name="m").solve(SUM_CSV)
+    assert ei.value.partial_usage.total > 0
+    assert ei.value.partial_cost_usd is None  # "m" is unpriced
+
+
+def test_graph_crash_carries_tracker_usage(settings):
+    trackers: list[UsageTracker] = []
+    scripts = lambda: {"planner": [plan()], "architect": [layout()], "coder": []}
+    system = _graph_system(settings, ScriptedSandbox(), trackers, scripts)
+    with pytest.raises(ScriptExhaustedError) as ei:
+        system.solve(SUM_CSV)
+    assert ei.value.partial_usage.total == trackers[0].total_tokens > 0
+
+
+# --- budgets ----------------------------------------------------------------
+
+
+def test_budget_files_for_baselines_equal_final(settings):
+    out = SingleShot(FakeLLM([files_reply("x")]), ForbiddenSandbox(), model_name="m").solve(SUM_CSV)
+    assert out.budget_files == out.files
+    llm = FakeLLM([files_reply(f"v{i}") for i in range(6)])
+    sb = ScriptedSandbox(*[res(1, "e")] * 6)
+    out = SingleAgentLoop(llm, sb, settings, model_name="m").solve(SUM_CSV)
+    assert out.attempts == 4 and out.budget_files == out.files
+
+
+def test_loop_default_repairs_come_from_settings():
+    s = Settings(max_repairs=1)
+    llm = FakeLLM([files_reply(f"v{i}") for i in range(6)])
+    sb = ScriptedSandbox(*[res(1, "e")] * 6)
+    out = SingleAgentLoop(llm, sb, s, model_name="m").solve(SUM_CSV)
+    assert out.attempts == 2
+
+
+def _gen6_scripts():
+    """Replan after generation 2; the 6th generation is the first that contains GOOD."""
+    bad = lambda i: code(f"print({i})")
+    return {
+        "planner": [plan("a"), plan("b")], "architect": [layout(), layout()],
+        "coder": [bad(1), bad(3)],
+        "debugger": [bad(2), bad(4), bad(5), code("print('GOOD')")],
+        "reviewer": [verdict("fix"), verdict("replan"), verdict("fix"), verdict("fix"),
+                     verdict("fix"), verdict("pass")],
+    }
+
+
+class GoodMarkerSandbox:
+    """Exit 0 iff some workspace file contains GOOD (used for running and for grading)."""
+
+    def run(self, workspace, command, limits=None):
+        good = any("GOOD" in p.read_text() for p in workspace.rglob("*.py"))
+        return ExecResult(0 if good else 1, "1 passed in 0.01s\n" if good else "1 failed\n",
+                          "" if good else "boom", False, False, 0.0)
+
+
+def test_graph_replan_then_pass_on_generation_six_misses_matched_budget(settings):
+    from coding_agent.evaluation import run_benchmark
+    system = _graph_system(settings, GoodMarkerSandbox(), [], _gen6_scripts)
+    out = system.solve(SUM_CSV)
+    assert out.attempts == 6 and "GOOD" in out.files["main.py"]
+    assert "GOOD" not in out.budget_files["main.py"]  # generation 4 = max_repairs + 1
+    assert out.had_runtime_error and not out.fixed  # 5 repairs-equivalents > 3
+    import tempfile
+    from pathlib import Path
+    system = _graph_system(settings, GoodMarkerSandbox(), [], _gen6_scripts)
+    with tempfile.TemporaryDirectory() as d:
+        (r,) = run_benchmark([SUM_CSV], system, GoodMarkerSandbox(), out_dir=Path(d))
+    assert r.final_pass is True and r.matched_budget_pass is False and r.first_try_pass is False
+
+
+def test_graph_repair_limit_stop_uses_fourth_generation(settings):
+    bads = [code(f"print({i})") for i in range(4)]
+    scripts = lambda: {
+        "planner": [plan()], "architect": [layout()], "coder": bads[:1], "debugger": bads[1:],
+        "reviewer": [verdict("fix")] * 4,
+    }
+    out = _graph_system(settings, ScriptedSandbox(*[res(1, "e")] * 4), [], scripts).solve(SUM_CSV)
+    assert out.attempts == 4 and out.budget_files == out.files and not out.fixed
+
+
+def test_graph_describe_reports_resolved_roles(settings):
+    system = _graph_system(settings, ScriptedSandbox(res(0)), [], _happy_scripts)
+    assert "resolved_roles" not in system.describe() or system.describe()["resolved_roles"] == {}
+    system.solve(SUM_CSV)
+    assert system.describe()["resolved_roles"]["coder"] == "fake-coder"
