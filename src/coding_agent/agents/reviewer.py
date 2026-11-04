@@ -4,7 +4,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from coding_agent.agents.context import event, exec_streams, exec_summary, format_files, format_list
+from coding_agent.agents.context import (
+    event,
+    exec_streams,
+    exec_summary,
+    format_files,
+    format_list,
+    task_text,
+)
 from coding_agent.agents.executor import describe_command
 from coding_agent.agents.json_out import invoke_json
 from coding_agent.agents.prompts import REVIEWER_SYSTEM, REVIEWER_USER
@@ -65,7 +72,7 @@ def make_reviewer(
         user = REVIEWER_USER.format(
             command=" ".join(command) if command else "(none)",
             command_meaning=describe_command(command),
-            task=state["task"], criteria=format_list(state["criteria"]),
+            task=task_text(state["task"], state["fixtures"]), criteria=format_list(state["criteria"]),
             files=format_files(state["files"]), exec_summary=exec_summary(last),
             stdout=stdout, stderr=stderr, flags=_flags_text(version),
             repairs=state["repairs"], replans=state["replans"],

@@ -32,7 +32,7 @@ class GraphSystem:
         start = time.monotonic()
         tracker = UsageTracker()
         graph = build_graph(self._router_factory(tracker), self._sandbox, self._settings)
-        state = run_graph(graph, task_prompt(task))
+        state = run_graph(graph, task_prompt(task, with_fixtures=False), task.fixtures)
         versions = state["code_versions"]
         attempts = max(1, sum(1 for e in state["events"] if e["node"] == "coder"))
         failed = [v["exit_code"] != 0 or v["timed_out"] for v in versions]

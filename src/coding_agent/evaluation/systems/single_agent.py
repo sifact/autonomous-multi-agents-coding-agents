@@ -44,7 +44,7 @@ class SingleAgentLoop:
         first_files, attempts = dict(files), 1
         had_error, first_ok, last_ok = False, None, False
         while True:
-            _, result = execute_files(files, self._sandbox, self._settings)
+            _, result = execute_files(files, self._sandbox, self._settings, task.fixtures)
             last_ok = not _failed(result)
             if first_ok is None:
                 first_ok = last_ok

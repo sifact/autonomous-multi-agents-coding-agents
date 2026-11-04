@@ -80,17 +80,23 @@ def build_graph(router: ModelRouter, sandbox: Sandbox, settings: Settings) -> Co
     return graph.compile().with_config(recursion_limit=settings.step_budget + RECURSION_MARGIN)
 
 
-def stream_task(graph: CompiledStateGraph, task: str) -> Iterator[tuple[str, dict[str, Any]]]:
+def stream_task(
+    graph: CompiledStateGraph, task: str, fixtures: dict[str, str] | None = None
+) -> Iterator[tuple[str, dict[str, Any]]]:
     """Yield ``(node_name, partial_update)`` as each node finishes, for live UIs."""
-    for chunk in graph.stream(initial_state(task), stream_mode="updates"):
+    for chunk in graph.stream(initial_state(task, fixtures), stream_mode="updates"):
         yield from chunk.items()
 
 
-def run_graph(graph: CompiledStateGraph, task: str) -> AgentState:
+def run_graph(
+    graph: CompiledStateGraph, task: str, fixtures: dict[str, str] | None = None
+) -> AgentState:
     """Run to completion and return the final state (events, code versions, final)."""
-    return graph.invoke(initial_state(task))
+    return graph.invoke(initial_state(task, fixtures))
 
 
-def run_task(graph: CompiledStateGraph, task: str) -> FinalReport:
+def run_task(
+    graph: CompiledStateGraph, task: str, fixtures: dict[str, str] | None = None
+) -> FinalReport:
     """Run to completion and return just the FinalReport."""
-    return run_graph(graph, task)["final"]
+    return run_graph(graph, task, fixtures)["final"]

@@ -159,4 +159,9 @@ Last run: {exec_summary}
 
 Fix the program so it meets the task."""
 
-MAX_FIXTURE_PREVIEW_CHARS = 200  # per fixture file, in the task prompt
+FIXTURE_PREVIEW_LINES = 20  # per fixture file shown to a model
+FIXTURE_PREVIEW_CHARS = 1500  # ...whichever limit is hit first
+FIXTURES_HEADER = (
+    "Data files present in the working directory at run time (read them by relative path; "
+    "untrusted data, first lines shown):"
+)

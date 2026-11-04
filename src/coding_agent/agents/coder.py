@@ -21,6 +21,7 @@ from coding_agent.agents.context import (
     format_files,
     format_list,
     format_plan,
+    task_text,
 )
 from coding_agent.agents.json_out import ParseError, parse_json
 from coding_agent.agents.prompts import CODER_SYSTEM, CODER_USER, DEBUGGER_SYSTEM, DEBUGGER_USER
@@ -96,14 +97,14 @@ def make_coder(
         if repairing:
             stdout, stderr = exec_streams(state.get("last_exec"))
             user = DEBUGGER_USER.format(
-                task=state["task"], criteria=format_list(state["criteria"]),
+                task=task_text(state["task"], state["fixtures"]), criteria=format_list(state["criteria"]),
                 files=format_files(state["files"]), exec_summary=exec_summary(state.get("last_exec")),
                 stdout=stdout, stderr=stderr, reason=verdict.reason or "(none)",
             )
             resp = repairer.invoke(DEBUGGER_SYSTEM, user)
         else:
             user = CODER_USER.format(
-                task=state["task"], plan=format_plan(state["plan"]),
+                task=task_text(state["task"], state["fixtures"]), plan=format_plan(state["plan"]),
                 criteria=format_list(state["criteria"]), layout=format_list(state["layout"]),
             )
             resp = model.invoke(CODER_SYSTEM, user)

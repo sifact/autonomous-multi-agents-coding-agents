@@ -54,6 +54,7 @@ class AgentState(TypedDict):
     """Graph state. Scalars overwrite; ``events`` appends via its reducer."""
 
     task: str
+    fixtures: dict[str, str]  # read-only data files present at run time
     plan: list[Step]
     criteria: list[str]
     layout: list[str]
@@ -68,10 +69,10 @@ class AgentState(TypedDict):
     final: FinalReport | None
 
 
-def initial_state(task: str) -> AgentState:
+def initial_state(task: str, fixtures: dict[str, str] | None = None) -> AgentState:
     """Fresh state: counters at zero, containers empty and unshared."""
     return AgentState(
-        task=task, plan=[], criteria=[], layout=[], files={}, code_versions=[],
+        task=task, fixtures=dict(fixtures or {}), plan=[], criteria=[], layout=[], files={}, code_versions=[],
         last_exec=None, verdict=None, repairs=0, replans=0, visits=0,
         events=[], final=None,
     )

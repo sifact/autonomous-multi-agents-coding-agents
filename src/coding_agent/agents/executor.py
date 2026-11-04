@@ -89,7 +89,8 @@ def _capped(r: ExecResult) -> ExecResult:
 
 
 def execute_files(
-    files: dict[str, str], sandbox: Sandbox, settings: Settings
+    files: dict[str, str], sandbox: Sandbox, settings: Settings,
+    fixtures: dict[str, str] | None = None,
 ) -> tuple[list[str] | None, ExecResult]:
     """Run ``files`` in a fresh workspace; return ``(command, capped result)``.
 
@@ -106,6 +107,8 @@ def execute_files(
     try:
         try:
             write_files(workspace, files)
+            # Fixtures last (as in the grader) so agent files cannot replace the data.
+            write_files(workspace, fixtures or {})
         except (PathEscapeError, OSError) as exc:
             # Model-chosen paths ('' or '.', a file and a dir with one name,
             # escapes) are the model's bug: report it, never crash the run.
@@ -126,7 +129,7 @@ def make_executor(sandbox: Sandbox, settings: Settings) -> Callable[[AgentState]
     def executor(state: AgentState) -> dict[str, Any]:
         files = dict(state["files"])
         flags = policy_flags(files)
-        command, result = execute_files(files, sandbox, settings)
+        command, result = execute_files(files, sandbox, settings, state["fixtures"])
         version = {
             "version": len(state["code_versions"]) + 1,
             "files": files,

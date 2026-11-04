@@ -5,7 +5,13 @@ import html
 import re
 from typing import Any
 
-from coding_agent.agents.prompts import MAX_EXEC_PROMPT_CHARS, MAX_FILES_PROMPT_CHARS
+from coding_agent.agents.prompts import (
+    FIXTURE_PREVIEW_CHARS,
+    FIXTURE_PREVIEW_LINES,
+    FIXTURES_HEADER,
+    MAX_EXEC_PROMPT_CHARS,
+    MAX_FILES_PROMPT_CHARS,
+)
 from coding_agent.graph import Step
 from coding_agent.llm import Usage
 from coding_agent.sandbox import ExecResult, truncate
@@ -59,6 +65,26 @@ def format_files(files: dict[str, str], max_chars: int = MAX_FILES_PROMPT_CHARS)
         fence = _fence_for(body)
         blocks.append(tagged("file", f"{fence}\n{body}\n{fence}", path=path))
     return "\n\n".join(blocks)
+
+
+def format_fixtures(fixtures: dict[str, str]) -> str:
+    """Section naming each fixture path with a short, untrusted-tagged preview; '' if none."""
+    if not fixtures:
+        return ""
+    blocks = []
+    for path, text in sorted(fixtures.items()):
+        lines = text.splitlines()
+        preview = truncate("\n".join(lines[:FIXTURE_PREVIEW_LINES]), FIXTURE_PREVIEW_CHARS)
+        if len(lines) > FIXTURE_PREVIEW_LINES or len(preview) < len(text.rstrip("\n")):
+            preview += "\n... (truncated)"
+        blocks.append(tagged("file", preview, path=path))
+    return FIXTURES_HEADER + "\n" + "\n\n".join(blocks)
+
+
+def task_text(task: str, fixtures: dict[str, str]) -> str:
+    """The task followed by its fixtures section (just the task when there are none)."""
+    section = format_fixtures(fixtures)
+    return f"{task}\n\n{section}" if section else task
 
 
 def exec_summary(r: ExecResult | None) -> str:

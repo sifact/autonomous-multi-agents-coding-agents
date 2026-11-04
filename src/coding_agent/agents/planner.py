@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from coding_agent.agents.context import event, exec_streams, format_plan
+from coding_agent.agents.context import event, exec_streams, format_plan, task_text
 from coding_agent.agents.json_out import invoke_json
 from coding_agent.agents.prompts import PLANNER_REPLAN, PLANNER_SYSTEM, PLANNER_USER
 from coding_agent.graph import AgentState, Step, apply_verdict_counters, bump_visit
@@ -48,7 +48,8 @@ def make_planner(
                 previous_plan=format_plan(state["plan"]), reason=verdict.reason, stderr=stderr
             )
         plan, usage, error = invoke_json(
-            model, PLANNER_SYSTEM, PLANNER_USER.format(task=state["task"], replan=replan), Plan
+            model, PLANNER_SYSTEM, PLANNER_USER.format(
+                task=task_text(state["task"], state["fixtures"]), replan=replan), Plan
         )
         fallback = plan is None
         if plan is None:

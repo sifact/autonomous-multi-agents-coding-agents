@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from coding_agent.agents.context import event, format_list, format_plan
+from coding_agent.agents.context import event, format_list, format_plan, task_text
 from coding_agent.agents.json_out import invoke_json
 from coding_agent.agents.prompts import ARCHITECT_SYSTEM, ARCHITECT_USER, DEFAULT_ENTRYPOINT
 from coding_agent.graph import AgentState, bump_visit
@@ -31,7 +31,7 @@ def make_architect(
 
     def architect(state: AgentState) -> dict[str, Any]:
         user = ARCHITECT_USER.format(
-            task=state["task"], plan=format_plan(state["plan"]), criteria=format_list(state["criteria"])
+            task=task_text(state["task"], state["fixtures"]), plan=format_plan(state["plan"]), criteria=format_list(state["criteria"])
         )
         layout, usage, error = invoke_json(model, ARCHITECT_SYSTEM, user, Layout)
         if layout is None:
