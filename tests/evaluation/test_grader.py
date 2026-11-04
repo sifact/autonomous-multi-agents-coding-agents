@@ -160,8 +160,10 @@ def test_agent_cannot_fake_pass_with_own_hidden_test():
 @pytest.mark.parametrize(
     "name,content",
     [
-        ("conftest.py", "import pytest\n\n@pytest.hookimpl(trylast=True)\n"
-         "def pytest_collection_modifyitems(items):\n    items.clear()\n"),
+        (
+            "conftest.py",
+            "def pytest_collection_modifyitems(items):\n    items.clear()\n",
+        ),
         ("pytest.ini", "[pytest]\naddopts = -k nothing_matches\n"),
         ("tox.ini", "[pytest]\naddopts = -k nothing_matches\n"),
     ],
