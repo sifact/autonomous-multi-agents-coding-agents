@@ -178,4 +178,4 @@ def test_describe_lists_models_and_settings(settings):
 def test_system_output_defaults():
     from coding_agent.llm import Usage
     out = SystemOutput({}, 1, None, False, False, Usage(0, 0), None, 0.0)
-    assert out.error is None and out.first_files == {}
+    assert out.error is None and out.first_files is None

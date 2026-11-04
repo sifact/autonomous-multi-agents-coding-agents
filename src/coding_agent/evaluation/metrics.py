@@ -18,6 +18,7 @@ class RunRecord:
     tokens_out: int
     cost_usd: float | None  # None when the model has no known price (never 0)
     wall_s: float
+    error: str | None = None  # set when the run crashed; the record then counts as failed
 
 
 @dataclass(frozen=True)

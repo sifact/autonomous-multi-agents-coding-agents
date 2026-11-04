@@ -1,6 +1,7 @@
 """Evaluation: sandbox safety suite, task format, grader, metrics, eval systems."""
 from coding_agent.evaluation.grader import GradeResult, grade
 from coding_agent.evaluation.metrics import Metrics, RunRecord, aggregate
+from coding_agent.evaluation.runner import run_benchmark, save_results
 from coding_agent.evaluation.safety import CaseResult, SafetyReport, run_case, run_safety_suite
 from coding_agent.evaluation.safety_cases import SAFETY_CASES, HostContext, SafetyCase
 from coding_agent.evaluation.systems import (
@@ -31,6 +32,8 @@ __all__ = [
     "grade",
     "load_task",
     "load_tasks",
+    "run_benchmark",
     "run_case",
     "run_safety_suite",
+    "save_results",
 ]

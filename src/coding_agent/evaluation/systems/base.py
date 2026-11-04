@@ -12,10 +12,11 @@ Definitions (shared by every system so numbers are comparable):
   (exit code 0). ``None`` when the system never executes (SingleShot). The
   benchmark record's ``first_try_pass`` is different and authoritative: the
   runner grades ``first_files`` with the hidden tests.
-- ``first_files``: the files produced by the first generation (attempt 1).
+- ``first_files``: the files produced by the first generation (attempt 1);
+  ``None`` means "same as ``files``".
 - ``cost_usd``: ``None`` when any model used has no known price. Never 0.
 """
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Any, Protocol
 
 from coding_agent.config import Settings
@@ -36,7 +37,7 @@ class SystemOutput:
     cost_usd: float | None
     wall_s: float
     error: str | None = None
-    first_files: dict[str, str] = field(default_factory=dict)
+    first_files: dict[str, str] | None = None  # None: same as ``files``
 
 
 class System(Protocol):
