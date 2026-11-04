@@ -108,13 +108,14 @@ def test_invalid_power_and_overflow(tmp_path):
     huge = "9" * 400
     code, out, _ = calc(
         tmp_path, "-8 0.5 ^", "0 -1 ^", "10 1000 ^", "10 20 ^", "10 308 ^ 10 *", huge,
-        f"1 {huge} +", "0 0 ^", "-2 2 ^", "1e 5",
+        f"1 {huge} +", "9" * 308 + " " + "9" * 308 + " +", "1" + "0" * 308 + " 0.1 /",
+        "0 0 ^", "-2 2 ^", "1e 5",
     )
     assert code == 1
     assert out == [
         "error: invalid power", "error: invalid power", "error: invalid power",
         "100000000000000000000", "error: overflow", "error: overflow", "error: overflow",
-        "1", "4", "error: bad token: 1e",
+        "error: overflow", "error: overflow", "1", "4", "error: bad token: 1e",
     ]
 
 
@@ -149,3 +150,8 @@ def test_command_line_arguments_exit_2(tmp_path):
 def test_unicode_in_bad_token_is_echoed(tmp_path):
     code, out, _ = calc(tmp_path, "1 é +")
     assert (code, out) == (1, ["error: bad token: é"])
+
+
+def test_lone_carriage_return_is_a_separator_inside_a_line(tmp_path):
+    r = run(tmp_path, "1 2\r+\n3\r4 *\r\n")
+    assert (r.returncode, r.stdout) == (0, b"3\n12\n")

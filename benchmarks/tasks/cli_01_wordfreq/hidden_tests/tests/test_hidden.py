@@ -103,3 +103,8 @@ def test_file_is_read_not_stdin_and_nothing_is_modified(tmp_path):
     assert r.stdout == lines(["2 x", "1 y"])
     assert (tmp_path / "t.txt").read_text(encoding="utf-8") == "x x y\n"
     assert sorted(p.name for p in tmp_path.iterdir()) == ["t.txt"]
+
+
+def test_lower_not_casefold_and_isalnum_covers_fractions_and_numerals(tmp_path):
+    assert run(tmp_path, stdin="Straße STRASSE\n").stdout == lines(["1 strasse", "1 straße"])
+    assert run(tmp_path, stdin="x½ Ⅷ\n").stdout == lines(["1 x½", "1 ⅷ"])

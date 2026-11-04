@@ -85,6 +85,7 @@ def test_lines_that_only_look_like_entries_are_continuations(tmp_path):
         "٢٠٢٤-٠٥-٠١ ١٠:٠٠:٠٠ FATAL arabic digits",
         f"{T} FATALITY",
         f" {T} FATAL leading space",
+        f"{T} ERROR: colon", f"{T} ERROR\tTab",
     ])
     r = run(tmp_path, "--min-level", "ERROR", stdin=log)
     assert (r.returncode, r.stdout) == (1, "")
@@ -166,3 +167,21 @@ def test_unreadable_file_exits_3(tmp_path):
     r = run(tmp_path, "bad.log")
     assert (r.returncode, r.stdout) == (3, "")
     assert "Traceback" not in r.stderr
+
+
+def run_bytes(cwd, data, *args):
+    return subprocess.run(
+        [sys.executable, str(MAIN), *args], cwd=cwd, input=data, capture_output=True,
+        env=ENV, timeout=10,
+    )
+
+
+def test_crlf_and_odd_whitespace_characters_pass_through_byte_for_byte(tmp_path):
+    data = (b"2024-05-01 10:00:00 INFO a\r\n  more\r\n"
+            b"2024-05-01 10:00:01 WARN x\x0cy\xc2\x85z\r\n\r\n")
+    r = run_bytes(tmp_path, data)
+    assert (r.returncode, r.stdout) == (0, data)
+    r = run_bytes(tmp_path, data, "--min-level", "WARN")
+    assert r.stdout == data.split(b"\n", 2)[2]
+    (tmp_path / "crlf.log").write_bytes(data)
+    assert run_bytes(tmp_path, b"", "crlf.log").stdout == data
