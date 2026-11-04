@@ -10,7 +10,8 @@ the working directory.
 - Keys are lower-cased (`configparser`'s normal behaviour).
 - Do not use interpolation: a `%` in a value is just a character.
 - Inline comments: a `;` or `#` that is preceded by whitespace starts a comment, which is
-  removed together with the whitespace before it (a value that is only a comment becomes `""`). A `;` or `#` inside a word (`a#b`) is kept.
+  removed together with the whitespace before it (a value that is only a comment becomes `""`).
+  A `;` or `#` inside a word (`a#b`) is kept.
   Full-line comments are ignored as usual.
 - Type conversion of each value (after stripping whitespace), checked in this order:
   1. `true`, `yes`, `on` (any letter case) become `True`; `false`, `no`, `off` become `False`.
@@ -18,7 +19,8 @@ the working directory.
      (`"007"` gives `7`, `"1"` and `"0"` are ints, not booleans).
   3. Text matching exactly an optional `-`, digits, `.`, digits becomes a `float`
      (`"0.75"`, `"-2.50"`). Things like `"5."`, `".5"`, `"+5"`, `"1e3"` and `"1.5.2"` stay strings.
-  4. Anything else (quotes are not interpreted: `"yes"` with its quotes is a string), including the empty string and words like `none`, `null`, `y`, `n`, `t`,
+  4. Anything else (quotes are not interpreted: `"yes"` with its quotes is a string),
+     including the empty string and words like `none`, `null`, `y`, `n`, `t`,
      `f` or `1_000`, stays a string.
 - A missing file raises `FileNotFoundError` (note that `ConfigParser.read` silently ignores
   missing files, so open the file yourself).

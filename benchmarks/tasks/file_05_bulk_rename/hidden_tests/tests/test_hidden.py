@@ -101,3 +101,11 @@ def test_old_name_stays_taken_when_its_file_is_renamed_away(tmp_path):
     assert listing(tmp_path) == [".txt", "x_1.txt"]
     assert (tmp_path / ".txt").read_text() == "1"
     assert (tmp_path / "x_1.txt").read_text() == "2"
+
+
+def test_suffix_for_a_name_without_extension_part(tmp_path):
+    d = make(tmp_path, {".txt": "dot", "x.txt": "x"})
+    # splitext(".txt") == (".txt", ""), so the free name is ".txt_1"
+    assert rename_files(d, r"^x", "", apply=True) == [("x.txt", ".txt_1")]
+    assert listing(tmp_path) == [".txt", ".txt_1"]
+    assert (tmp_path / ".txt").read_text() == "dot"

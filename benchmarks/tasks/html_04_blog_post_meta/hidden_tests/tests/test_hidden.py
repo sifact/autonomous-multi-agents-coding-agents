@@ -133,3 +133,8 @@ def test_author_meta_is_found_anywhere_in_the_page():
 def test_first_author_meta_decides_even_if_its_content_is_empty():
     head = '<meta name="author" content=""><meta name="author" content="Later">'
     assert parse_post(post("", head))["author"] is None
+
+
+def test_empty_first_h1_is_the_title():
+    assert parse_post(post("<h1></h1><h1>B</h1>"))["title"] == ""
+    assert parse_post(post("<h1>  </h1><h1>B</h1>"))["title"] == ""

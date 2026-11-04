@@ -79,9 +79,10 @@ def test_large_files_differing_only_at_the_end(tmp_path):
 
 def test_plain_string_order_uppercase_before_lowercase(tmp_path):
     root = build(tmp_path, {
-        "b.txt": b"s", "C.txt": b"s", "a.txt": b"s", "Z/x": b"q", "a/x": b"q",
+        "b.txt": b"s", "C.txt": b"s", "a.txt": b"s", "m/x": b"q", "a/x": b"q",
     })
-    assert find_duplicates(root) == [["C.txt", "a.txt", "b.txt"], ["Z/x", "a/x"]]
+    # group order: "C.txt" < "a/x" in plain string order (a case-insensitive sort puts a/x first)
+    assert find_duplicates(root) == [["C.txt", "a.txt", "b.txt"], ["a/x", "m/x"]]
 
 
 def test_hidden_files_and_directories_are_included(tmp_path):

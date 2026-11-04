@@ -12,7 +12,8 @@ The sample directory `photos/` is in the working directory.
 3. A new name must never overwrite anything. The set of *taken* names is every file and
    subdirectory name in `directory` before the run plus the new names already assigned
    earlier in this run. If the new name is taken, try `<stem>_1<ext>`, then `<stem>_2<ext>`,
-   and so on until a name is free, where `stem, ext = os.path.splitext(new_name)`.
+   and so on until a name is free, where `stem, ext = os.path.splitext(new_name)`
+   (so a name such as `.txt` has no extension and becomes `.txt_1`).
    (A file keeps its own old name as taken, even when another file is renamed away from it.)
 4. Return the list of `(old_name, new_name)` pairs, base names only, in processing order.
 5. With `apply=False` (the default, a dry run) nothing on disk changes. With `apply=True`
