@@ -15,7 +15,14 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from coding_agent.agents.context import event, exec_summary
-from coding_agent.agents.prompts import DEFAULT_ENTRYPOINT, MAX_EXEC_OUTPUT_CHARS
+from coding_agent.agents.prompts import (
+    COMMAND_MEANING_MAIN,
+    COMMAND_MEANING_NONE,
+    COMMAND_MEANING_SYNTAX,
+    COMMAND_MEANING_TESTS,
+    DEFAULT_ENTRYPOINT,
+    MAX_EXEC_OUTPUT_CHARS,
+)
 from coding_agent.config import Settings
 from coding_agent.graph import AgentState, bump_visit
 from coding_agent.sandbox import (
@@ -44,6 +51,17 @@ def choose_command(files: dict[str, str]) -> list[str] | None:
         return ["python", DEFAULT_ENTRYPOINT]
     modules = sorted(p for p in files if p.endswith(".py"))
     return ["python", "-m", "py_compile", *modules] if modules else None
+
+
+def describe_command(command: list[str] | None) -> str:
+    """Plain statement of what ``command`` proves, for the reviewer."""
+    if not command:
+        return COMMAND_MEANING_NONE
+    if command[:3] == PYTEST_COMMAND[:3]:
+        return COMMAND_MEANING_TESTS
+    if command[:3] == ["python", "-m", "py_compile"]:
+        return COMMAND_MEANING_SYNTAX
+    return COMMAND_MEANING_MAIN
 
 
 def policy_flags(files: dict[str, str]) -> list[dict[str, Any]]:
@@ -81,10 +99,18 @@ def make_executor(sandbox: Sandbox, settings: Settings) -> Callable[[AgentState]
             return None, _failure("No Python files to run: expected main.py, tests or modules.")
         workspace = make_workspace(settings.workspace_root)
         try:
-            write_files(workspace, files)
+            try:
+                write_files(workspace, files)
+            except (PathEscapeError, OSError) as exc:
+                # Model-chosen paths ('' or '.', a file and a dir with one name,
+                # escapes) are the model's bug: report it, never crash the run.
+                return None, _failure(
+                    f"Could not write the files ({type(exc).__name__}: {exc}). Use distinct "
+                    "relative file paths inside the project."
+                )
+            # Docker/infrastructure errors from here on propagate: they are not
+            # something the coder can fix.
             return command, sandbox.run(workspace, command, settings.limits)
-        except PathEscapeError as exc:
-            return command, _failure(f"PathEscapeError: {exc}. Use relative paths inside the project.")
         finally:
             shutil.rmtree(workspace, ignore_errors=True)
 
@@ -100,6 +126,7 @@ def make_executor(sandbox: Sandbox, settings: Settings) -> Callable[[AgentState]
             "exit_code": result.exit_code,
             "timed_out": result.timed_out,
             "oom_killed": result.oom_killed,
+            "disk_exceeded": result.disk_exceeded,
             "summary": exec_summary(result),
             "flags": flags,
         }

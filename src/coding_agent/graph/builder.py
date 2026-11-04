@@ -50,12 +50,23 @@ def build_graph(router: ModelRouter, sandbox: Sandbox, settings: Settings) -> Co
             "events": [{"node": "finalize", "success": report.success}],
         }
 
+    def model(role: str):
+        return router.for_role(role), router.model_name(role)
+
+    planner, planner_name = model("planner")
+    architect, architect_name = model("architect")
+    coder, coder_name = model("coder")
+    debugger, debugger_name = model("debugger")
+    reviewer, reviewer_name = model("reviewer")
+
     graph = StateGraph(AgentState)
-    graph.add_node("planner", make_planner(router.for_role("planner")))
-    graph.add_node("architect", make_architect(router.for_role("architect")))
-    graph.add_node("coder", make_coder(router.for_role("coder"), router.for_role("debugger")))
+    graph.add_node("planner", make_planner(planner, name=planner_name))
+    graph.add_node("architect", make_architect(architect, name=architect_name))
+    graph.add_node("coder", make_coder(
+        coder, debugger, name=coder_name, debugger_name=debugger_name,
+    ))
     graph.add_node("executor", make_executor(sandbox, settings))
-    graph.add_node("reviewer", make_reviewer(router.for_role("reviewer")))
+    graph.add_node("reviewer", make_reviewer(reviewer, name=reviewer_name))
     graph.add_node("finalize", finalize)
     graph.add_edge(START, "planner")
     graph.add_edge("planner", "architect")

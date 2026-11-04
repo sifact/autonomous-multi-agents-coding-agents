@@ -24,8 +24,10 @@ class Layout(BaseModel):
     files: list[FileSpec] = Field(min_length=1)
 
 
-def make_architect(model: ChatModel) -> Callable[[AgentState], dict[str, Any]]:
-    """Build the architect node around ``model`` (role "architect")."""
+def make_architect(
+    model: ChatModel, *, name: str | None = None
+) -> Callable[[AgentState], dict[str, Any]]:
+    """Build the architect node around ``model`` (role "architect"; ``name`` goes on events)."""
 
     def architect(state: AgentState) -> dict[str, Any]:
         user = ARCHITECT_USER.format(
@@ -37,7 +39,7 @@ def make_architect(model: ChatModel) -> Callable[[AgentState], dict[str, Any]]:
             paths = [DEFAULT_ENTRYPOINT]
         else:
             paths = [f"{f.path}: {f.purpose}" if f.purpose else f.path for f in layout.files]
-        extra: dict[str, Any] = {"files": len(paths)}
+        extra: dict[str, Any] = {"model": name, "files": len(paths), "fallback": layout is None}
         if error:
             extra["error"] = error
         return {"layout": paths, **bump_visit(state), "events": [event("architect", usage, **extra)]}

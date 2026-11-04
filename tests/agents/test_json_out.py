@@ -59,3 +59,15 @@ def test_invoke_json_recovers_on_retry():
     llm = FakeLLM(["oops", '{"name": "a", "n": 1}'])
     obj, _, _ = invoke_json(llm, "sys", "user", Thing)
     assert obj == Thing(name="a", n=1) and len(llm.calls) == 2
+
+
+def test_prefer_last_picks_last_valid_object():
+    text = '{"name": "first", "n": 1} junk {"bad": 1} {"name": "last", "n": 2}'
+    assert parse_json(text, Thing).name == "first"
+    assert parse_json(text, Thing, prefer="last").name == "last"
+
+
+def test_invoke_json_passes_prefer():
+    llm = FakeLLM(['{"name": "a", "n": 1} {"name": "b", "n": 2}'])
+    obj, _, _ = invoke_json(llm, "s", "u", Thing, prefer="last")
+    assert obj.name == "b"

@@ -117,3 +117,29 @@ def test_long_error_is_truncated_in_explanation(settings):
     s["verdict"] = Verdict(action="stop", reason="r")
     report = build_report(s, settings)
     assert "ValueError: last" in report.explanation and len(report.explanation) < 2_000
+
+
+def test_recursion_limit_pinned(settings):
+    router, _ = scripted_router(settings)
+    graph = build_graph(router, CannedSandbox(OK), settings)
+    assert graph.config["recursion_limit"] == settings.step_budget + 10
+
+
+def test_events_carry_model_names(settings):
+    router, _ = scripted_router(
+        settings, planner=[plan()], architect=[layout()], coder=[code("print('ok')")],
+        reviewer=[verdict("pass")],
+    )
+    state = run_graph(build_graph(router, CannedSandbox(OK), settings), "t")
+    models = {e["node"]: e.get("model") for e in state["events"]}
+    assert models["planner"] == "fake-planner" and models["coder"] == "fake-coder"
+    assert models["reviewer"] == "fake-reviewer" and models["architect"] == "fake-architect"
+
+
+def test_report_notes_fallback(settings):
+    s = initial_state("t")
+    s.update(last_exec=OK, events=[{"node": "planner", "fallback": True}])
+    s["verdict"] = Verdict(action="pass", reason="ok")
+    assert "fallback" in build_report(s, settings).explanation.lower()
+    s["events"] = [{"node": "planner", "fallback": False}]
+    assert "fallback" not in build_report(s, settings).explanation.lower()

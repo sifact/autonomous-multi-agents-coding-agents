@@ -53,3 +53,12 @@ def test_architect_falls_back_to_main_py(state):
     llm = FakeLLM(["?", "??"])
     update = make_architect(llm)(state)
     assert update["layout"] == ["main.py"] and len(llm.calls) == 2
+
+
+def test_fallbacks_and_model_names_recorded(state):
+    p = make_planner(FakeLLM(["x", "y"]), name="m-plan")(state)["events"][0]
+    a = make_architect(FakeLLM(["x", "y"]), name="m-arch")(state)["events"][0]
+    assert p["fallback"] is True and p["model"] == "m-plan"
+    assert a["fallback"] is True and a["model"] == "m-arch"
+    ok = make_planner(FakeLLM([plan_json(1)]))(state)["events"][0]
+    assert ok["fallback"] is False

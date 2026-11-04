@@ -9,6 +9,19 @@ from coding_agent.graph.state import AgentState, FinalReport
 from coding_agent.llm import Usage
 from coding_agent.sandbox import ExecResult
 
+FALLBACK_NOTE = (
+    "Note: the {nodes} output was malformed twice, so a fallback (default) {what} was used."
+)
+
+
+def fallback_note(state: AgentState) -> str:
+    """A sentence naming any planner/architect fallback in this run, else ''."""
+    nodes = sorted({e["node"] for e in state["events"] if e.get("fallback")})
+    if not nodes:
+        return ""
+    what = " and ".join({"planner": "plan", "architect": "file layout"}.get(n, n) for n in nodes)
+    return FALLBACK_NOTE.format(nodes=" and ".join(nodes), what=what)
+
 
 def run_usage(state: AgentState) -> Usage:
     """Tokens of THIS run, summed from node events (a shared tracker spans runs)."""
@@ -57,6 +70,9 @@ def build_report(state: AgentState, settings: Settings) -> FinalReport:
         )
     else:
         explanation = _failure_explanation(state, settings)
+    note = fallback_note(state)
+    if note:
+        explanation = f"{explanation}\n{note}"
     return FinalReport(
         success=success, files=dict(state["files"]), explanation=explanation,
         repairs=state["repairs"], usage=run_usage(state),

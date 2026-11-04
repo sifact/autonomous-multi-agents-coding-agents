@@ -95,3 +95,37 @@ def test_no_entrypoint_compiles_modules(state, settings):
     state["files"] = {"stats.py": "def mean(x): return sum(x) / len(x)"}
     make_executor(sb, settings)(state)
     assert sb.calls[0][1] == ["python", "-m", "py_compile", "stats.py"]
+
+
+@pytest.mark.parametrize("files", [
+    {"main.py": "print(1)", "": "x"},
+    {"main.py": "print(1)", ".": "x"},
+    {"main.py": "print(1)", "pkg": "x", "pkg/a.py": "y"},
+    {"main.py": "print(1)", "pkg/a.py": "y", "pkg": "x"},
+], ids=["empty", "dot", "file-then-dir", "dir-then-file"])
+def test_bad_model_paths_are_execution_failures(state, settings, files):
+    sb = RecordingSandbox()
+    state["files"] = files
+    update = make_executor(sb, settings)(state)  # must not raise
+    assert sb.calls == []
+    r = update["last_exec"]
+    assert r.exit_code != 0 and "could not write" in r.stderr.lower()
+    assert list(settings.workspace_root.iterdir()) == []
+
+
+def test_infrastructure_errors_propagate(state, settings):
+    class Broken:
+        def run(self, workspace, command, limits=None):
+            raise FileNotFoundError("docker")
+
+    state["files"] = {"main.py": "print(1)"}
+    with pytest.raises(FileNotFoundError):
+        make_executor(Broken(), settings)(state)
+    assert list(settings.workspace_root.iterdir()) == []
+
+
+def test_disk_exceeded_recorded(state, settings):
+    r = ExecResult(137, "", "", False, False, 1.0, disk_exceeded=True)
+    state["files"] = {"main.py": "print(1)"}
+    update = make_executor(RecordingSandbox(r), settings)(state)
+    assert update["code_versions"][-1]["disk_exceeded"] is True

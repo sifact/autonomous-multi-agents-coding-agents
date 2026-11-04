@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
@@ -37,24 +38,40 @@ def _objects(text: str):
         i = text.find("{", end)
 
 
-def parse_json[T: BaseModel](text: str, schema: type[T]) -> T:
-    """Return the first JSON object in ``text`` that validates against ``schema``.
+Prefer = Literal["first", "last"]
+
+
+def parse_json[T: BaseModel](text: str, schema: type[T], prefer: Prefer = "first") -> T:
+    """Return a JSON object in ``text`` that validates against ``schema``.
 
     Small models wrap JSON in fences and prose, or emit a draft object before
     the real one, so every candidate is tried rather than only the first.
+
+    ``prefer="first"`` (planner, architect, coder fallback): fenced blocks win,
+    then the first valid object in the prose. ``prefer="last"`` (reviewer):
+    the LAST valid object in the whole reply, scanned in reading order, so an
+    object the model quotes from program output before writing its own verdict
+    cannot win. Fenced or not makes no difference in "last" mode.
     """
     last_error = "no JSON object found"
-    for chunk in _candidates(text):
+    chunks = [text] if prefer == "last" else _candidates(text)
+    found: T | None = None
+    for chunk in chunks:
         for obj in _objects(chunk):
             try:
-                return schema.model_validate(obj)
+                found = schema.model_validate(obj)
             except ValidationError as exc:
                 last_error = f"invalid {schema.__name__}: {exc.errors()[0]['msg']}"
+                continue
+            if prefer == "first":
+                return found
+    if found is not None:
+        return found
     raise ParseError(f"could not parse {schema.__name__}: {last_error}")
 
 
 def invoke_json[T: BaseModel](
-    model: ChatModel, system: str, user: str, schema: type[T]
+    model: ChatModel, system: str, user: str, schema: type[T], prefer: Prefer = "first"
 ) -> tuple[T | None, Usage, str]:
     """Ask for JSON, retrying ONCE with a reminder; never raise on bad output.
 
@@ -65,12 +82,12 @@ def invoke_json[T: BaseModel](
     resp = model.invoke(system, user)
     usage = resp.usage
     try:
-        return parse_json(resp.text, schema), usage, ""
+        return parse_json(resp.text, schema, prefer), usage, ""
     except ParseError:
         pass
     retry = model.invoke(system, f"{user}\n\n{JSON_RETRY_REMINDER.format(schema=schema.__name__)}")
     usage = Usage(usage.tokens_in + retry.usage.tokens_in, usage.tokens_out + retry.usage.tokens_out)
     try:
-        return parse_json(retry.text, schema), usage, ""
+        return parse_json(retry.text, schema, prefer), usage, ""
     except ParseError as exc:
         return None, usage, str(exc)

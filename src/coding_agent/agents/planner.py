@@ -31,8 +31,10 @@ def _fallback(task: str) -> Plan:
     )
 
 
-def make_planner(model: ChatModel) -> Callable[[AgentState], dict[str, Any]]:
-    """Build the planner node around ``model`` (role "planner")."""
+def make_planner(
+    model: ChatModel, *, name: str | None = None
+) -> Callable[[AgentState], dict[str, Any]]:
+    """Build the planner node around ``model`` (role "planner"; ``name`` goes on events)."""
 
     def planner(state: AgentState) -> dict[str, Any]:
         # Read the verdict BEFORE building the update: apply_verdict_counters
@@ -48,10 +50,13 @@ def make_planner(model: ChatModel) -> Callable[[AgentState], dict[str, Any]]:
         plan, usage, error = invoke_json(
             model, PLANNER_SYSTEM, PLANNER_USER.format(task=state["task"], replan=replan), Plan
         )
+        fallback = plan is None
         if plan is None:
             plan = _fallback(state["task"])
         criteria = plan.criteria or [s.acceptance for s in plan.steps]
-        extra: dict[str, Any] = {"steps": len(plan.steps), "replan": replanning}
+        extra: dict[str, Any] = {
+            "model": name, "steps": len(plan.steps), "replan": replanning, "fallback": fallback,
+        }
         if error:
             extra["error"] = error
         return {
