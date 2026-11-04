@@ -3,6 +3,7 @@ from dataclasses import replace
 import pytest
 
 from coding_agent.evaluation import Task, grade, load_tasks, validate_all, validate_task
+from coding_agent.evaluation.validate import count_test_cases
 from coding_agent.sandbox import DockerSandbox, ExecResult
 from tests.evaluation.helpers import TASKS
 
@@ -85,12 +86,64 @@ def test_validate_all_flags_duplicate_ids():
     assert report["t1"] and "duplicate" in report["t1"][0]
 
 
+def test_tests_without_checks_do_not_count():
+    src = "def test_a():\n    pass\n\ndef test_b():\n    pass\n\ndef test_c():\n    pass\n"
+    assert count_test_cases(src) == 0
+    assert any("case" in p for p in validate_task(make(hidden_tests={"t.py": src}), FakeSandbox()))
+
+
+def test_raises_and_approx_count_as_checks():
+    src = (
+        "import pytest\n"
+        "def test_a():\n    with pytest.raises(ValueError):\n        int('x')\n"
+        "def test_b():\n    x = 1.0 == pytest.approx(1.0)\n"
+    )
+    assert count_test_cases(src) == 2
+
+
+def test_only_collectible_tests_count():
+    src = (
+        "def helper_test():\n    assert 1\n"
+        "def _test_x():\n    assert 1\n"
+        "def test_top():\n    assert 1\n"
+        "class Helper:\n    def test_m(self):\n        assert 1\n"
+        "class TestGroup:\n    def test_m(self):\n        assert 1\n"
+        "    def other(self):\n        assert 1\n"
+        "def outer():\n    def test_nested():\n        assert 1\n"
+    )
+    assert count_test_cases(src) == 2
+
+
+def test_prompt_leaking_test_function_name():
+    tests = GOOD_TESTS.replace("test_b", "test_total_by_month")
+    task = make(hidden_tests={"tests/test_hidden.py": tests}, prompt="See test_total_by_month.")
+    assert any("test_total_by_month" in p for p in validate_task(task, FakeSandbox()))
+    ok = make(hidden_tests={"tests/test_hidden.py": tests}, prompt="Compute totals by month.")
+    assert validate_task(ok, FakeSandbox()) == []
+
+
+def test_difficulty_validation():
+    assert validate_task(make(difficulty="easy"), FakeSandbox(), require_difficulty=True) == []
+    assert validate_task(make(), FakeSandbox()) == []  # optional by default
+    missing = validate_task(make(), FakeSandbox(), require_difficulty=True)
+    assert any("missing difficulty" in p for p in missing)
+    bad = validate_task(make(difficulty="x"), FakeSandbox())
+    assert any("invalid difficulty" in p for p in bad)
+
+
+def test_validate_all_passes_require_difficulty():
+    report = validate_all([make()], FakeSandbox(), require_difficulty=True)
+    assert any("difficulty" in p for p in report["t1"])
+
+
 @pytest.mark.docker
 def test_sample_tasks_in_docker():
     by_id = {t.id: t for t in load_tasks(TASKS)}
     sb = DockerSandbox(IMAGE)
-    # fix_mean has one test function only, so the only problem allowed is "too few cases".
-    for task in by_id.values():
-        problems = validate_task(task, sb)
-        assert all("case(s)" in p for p in problems), problems
+    # Samples are deliberately small: the only expected problem is too few hidden cases.
+    expected = {
+        "fix_mean": ["hidden tests have 1 case(s); need at least 3"],
+        "sum_csv": ["hidden tests have 2 case(s); need at least 3"],
+    }
+    assert {i: validate_task(t, sb) for i, t in by_id.items()} == expected
     assert grade(by_id["sum_csv"], by_id["sum_csv"].reference, sb).passed

@@ -30,5 +30,5 @@ def test_fixtures_are_small_text():
 @pytest.mark.docker
 @pytest.mark.parametrize("task", TASKS, ids=[t.id for t in TASKS])
 def test_task_is_valid(task):
-    problems = validate_task(task, DockerSandbox(IMAGE))
+    problems = validate_task(task, DockerSandbox(IMAGE), require_difficulty=True)
     assert problems == []

@@ -15,6 +15,7 @@ class Task:
     hidden_tests: dict[str, str]
     starter: dict[str, str] | None
     reference: dict[str, str]
+    difficulty: str | None = None
 
 
 def _read_tree(directory: Path) -> dict[str, str]:
@@ -45,6 +46,7 @@ def load_task(task_dir: Path) -> Task:
         hidden_tests=_read_tree(hidden_dir),
         starter=_read_tree(starter_dir) if starter_dir.is_dir() else None,
         reference=_read_tree(task_dir / "reference") if (task_dir / "reference").is_dir() else {},
+        difficulty=meta.get("difficulty"),
     )
 
 

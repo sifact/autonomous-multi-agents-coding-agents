@@ -23,10 +23,16 @@ def test_tie_break_by_name_on_rounded_total(tmp_path):
     assert top_customers(path, 4) == [("top", 99.0), ("Zed", 10.0), ("alice", 10.0), ("bob", 10.0)]
 
 
-def test_missing_amounts_and_zero_n(tmp_path):
+def test_missing_amounts_and_non_positive_n(tmp_path):
     path = write(tmp_path, "1,a,\n2,b,2.50\n3,a,1.25\n")
     assert top_customers(path, 1) == [("b", 2.5)]
     assert top_customers(path, 0) == []
+    assert top_customers(path, -1) == []
+
+
+def test_names_are_stripped_before_grouping(tmp_path):
+    path = write(tmp_path, "1, bob ,5.00\n2,bob,2.50\n3,al ,1.00\n")
+    assert top_customers(path, 5) == [("bob", 7.5), ("al", 1.0)]
 
 
 def test_empty_file(tmp_path):

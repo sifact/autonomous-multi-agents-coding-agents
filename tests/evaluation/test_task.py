@@ -47,3 +47,16 @@ def test_skips_hidden_and_underscore_dirs(tmp_path):
     for name in (".git", "__pycache__", "_draft"):
         (tmp_path / name).mkdir()
     assert load_tasks(tmp_path) == []
+
+
+def test_difficulty_read_from_toml(tmp_path):
+    d = tmp_path / "t"
+    (d / "hidden_tests").mkdir(parents=True)
+    (d / "hidden_tests" / "test_x.py").write_text("def test_x():\n    assert 1\n")
+    (d / "prompt.md").write_text("p")
+    (d / "task.toml").write_text('category = "data_script"\ndifficulty = "hard"\n')
+    from coding_agent.evaluation import load_task
+
+    assert load_task(d).difficulty == "hard"
+    (d / "task.toml").write_text('category = "data_script"\n')
+    assert load_task(d).difficulty is None

@@ -33,5 +33,5 @@ def test_header_only(tmp_path):
 
 def test_extra_columns_ignored(tmp_path):
     p = tmp_path / "c.csv"
-    p.write_text("id,email,name\n1,Q@z.com,Q\n2,q@z.com,R\n")
+    p.write_text("id,name,email\n1,Q,Q@z.com\n2,R,q@z.com\n")
     assert clean_emails(str(p)) == ["q@z.com"]

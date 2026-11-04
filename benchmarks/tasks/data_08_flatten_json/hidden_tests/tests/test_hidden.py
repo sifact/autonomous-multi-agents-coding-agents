@@ -48,6 +48,11 @@ def test_empty_containers_are_leaves_and_types_kept(tmp_path):
     assert result["t"] is True and result["n"] is None
 
 
+def test_empty_string_keys_are_ordinary_keys(tmp_path):
+    path = write(tmp_path, {"": 1, "a": {"": 2, "b": 3}, "c": {"": {}}})
+    assert flatten_file(path) == {"": 1, "a.": 2, "a.b": 3, "c.": {}}
+
+
 def test_top_level_array_and_empty(tmp_path):
     assert flatten_file(write(tmp_path, [{"x": 1}, [2]])) == {"0.x": 1, "1.0": 2}
     assert flatten_file(write(tmp_path, {})) == {}

@@ -38,8 +38,16 @@ def test_interleaved_sensors_first_row_order(tmp_path):
     assert list(find_outliers(write(tmp_path, rows))) == ["late", "zeta"]
 
 
+def test_reverse_alphabetical_first_row_order(tmp_path):
+    rows = [("zeta", v) for v in (1, 2, 3, 4, 5, 6, 100)]
+    rows += [("alpha", v) for v in (1, 2, 3, 4, 5, 6, 100)]
+    result = find_outliers(write(tmp_path, rows))
+    assert list(result) == ["zeta", "alpha"]
+
+
 def test_small_groups_and_bad_values_ignored(tmp_path):
-    rows = [("a", 1), ("a", 2), ("a", 1000)] + [("b", "x"), ("b", ""), ("b", "nan")]
+    rows = [("a", 1), ("a", 2), ("a", 1000), ("c", "x"), ("c", "")]
+    rows += [("b", "x"), ("b", ""), ("b", "nan")]
     rows += [("b", v) for v in (1, 2, 3, 4, 50)] + [("b", "inf")]
     assert find_outliers(write(tmp_path, rows)) == {"b": [50.0]}
 

@@ -23,7 +23,7 @@ def find_outliers(path: str) -> dict[str, list[float]]:
                 groups[row["sensor"]].append(value)
     result: dict[str, list[float]] = {}
     for sensor, values in groups.items():
-        if len(values) < 4:
+        if not values:
             continue
         ordered = sorted(values)
         q1, q3 = _quantile(ordered, 0.25), _quantile(ordered, 0.75)

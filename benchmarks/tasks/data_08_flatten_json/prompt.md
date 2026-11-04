@@ -12,6 +12,8 @@ leaf value:
   unchanged.
 - An empty object or empty array is itself a leaf: it is kept as `{}` or `[]` under its
   path (`{"a": {}}` gives `{"a": {}}`).
+- An empty-string key is an ordinary key: `{"": 1}` gives `{"": 1}` and `{"a": {"": 2}}`
+  gives `{"a.": 2}`.
 - Keys appear in document order (depth first, left to right).
 - If the top level is an array, its positions are the first path parts (`[{"x": 1}]` gives
   `{"0.x": 1}`). A top-level empty object or array gives `{}`.

@@ -106,8 +106,9 @@ def test_offsets_are_converted_to_utc(tmp_path):
         "2024-03-04T23:30:00-02:00",   # 2024-03-05 01:30 UTC
         "2024-03-05T08:00:00Z",
         "2024-03-05T09:00:00",
+        "2024-03-05T22:00:00-05:00",
     ])
-    assert bucket_events(path, "day") == {"2024-03-04": 2, "2024-03-05": 3}
+    assert bucket_events(path, "day") == {"2024-03-04": 2, "2024-03-05": 3, "2024-03-06": 1}
 
 
 def test_bad_rows_skipped_and_empty(tmp_path):

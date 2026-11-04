@@ -7,6 +7,10 @@ Timestamps are ISO 8601 date-times such as `2024-03-04T13:45:10`, `2024-03-04T13
 `2024-03-04T13:45:10+02:00`. Convert every timestamp to UTC before bucketing. A timestamp
 without an offset is already UTC. Rows whose timestamp cannot be parsed are skipped.
 
+The only timestamp forms that are used are `YYYY-MM-DDTHH:MM:SS`, optionally followed by
+`Z` or by an offset `+HH:MM` / `-HH:MM`, plus unparseable text (for example `garbage` or an
+empty field). No date-only values, fractional seconds or space separators appear.
+
 `bucket` is one of the following; any other value raises `ValueError`:
 
 | bucket    | key format         | bucket covers                          |
