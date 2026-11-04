@@ -112,7 +112,6 @@ def test_debugger_sees_fixtures():
 
 @pytest.mark.docker
 def test_real_sandbox_program_reads_fixture():
-    code, _ = None, None
     _, result = execute_files({"main.py": READER}, DockerSandbox(IMAGE), Settings(sandbox_image=IMAGE),
                               fixtures=SUM_CSV.fixtures)
     assert result.exit_code == 0 and result.stdout.strip() == "1600.0"
