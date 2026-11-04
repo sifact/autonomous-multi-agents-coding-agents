@@ -88,37 +88,45 @@ def _capped(r: ExecResult) -> ExecResult:
     )
 
 
+def execute_files(
+    files: dict[str, str], sandbox: Sandbox, settings: Settings
+) -> tuple[list[str] | None, ExecResult]:
+    """Run ``files`` in a fresh workspace; return ``(command, capped result)``.
+
+    The one execution core shared by the graph's executor node and the
+    single-agent baseline, so both run code identically. Model-caused failures
+    (no files, bad paths) come back as a failed result; Docker errors propagate.
+    """
+    if not files:
+        return None, _failure("The coder produced no files (no ### FILE: blocks were found).")
+    command = choose_command(files)
+    if command is None:
+        return None, _failure("No Python files to run: expected main.py, tests or modules.")
+    workspace = make_workspace(settings.workspace_root)
+    try:
+        try:
+            write_files(workspace, files)
+        except (PathEscapeError, OSError) as exc:
+            # Model-chosen paths ('' or '.', a file and a dir with one name,
+            # escapes) are the model's bug: report it, never crash the run.
+            return None, _failure(
+                f"Could not write the files ({type(exc).__name__}: {exc}). Use distinct "
+                "relative file paths inside the project."
+            )
+        # Docker/infrastructure errors from here on propagate: they are not
+        # something the coder can fix.
+        return command, _capped(sandbox.run(workspace, command, settings.limits))
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
 def make_executor(sandbox: Sandbox, settings: Settings) -> Callable[[AgentState], dict[str, Any]]:
     """Build the executor node. It runs code only; it never touches counters."""
-
-    def run(files: dict[str, str]) -> tuple[list[str] | None, ExecResult]:
-        if not files:
-            return None, _failure("The coder produced no files (no ### FILE: blocks were found).")
-        command = choose_command(files)
-        if command is None:
-            return None, _failure("No Python files to run: expected main.py, tests or modules.")
-        workspace = make_workspace(settings.workspace_root)
-        try:
-            try:
-                write_files(workspace, files)
-            except (PathEscapeError, OSError) as exc:
-                # Model-chosen paths ('' or '.', a file and a dir with one name,
-                # escapes) are the model's bug: report it, never crash the run.
-                return None, _failure(
-                    f"Could not write the files ({type(exc).__name__}: {exc}). Use distinct "
-                    "relative file paths inside the project."
-                )
-            # Docker/infrastructure errors from here on propagate: they are not
-            # something the coder can fix.
-            return command, sandbox.run(workspace, command, settings.limits)
-        finally:
-            shutil.rmtree(workspace, ignore_errors=True)
 
     def executor(state: AgentState) -> dict[str, Any]:
         files = dict(state["files"])
         flags = policy_flags(files)
-        command, raw = run(files)
-        result = _capped(raw)
+        command, result = execute_files(files, sandbox, settings)
         version = {
             "version": len(state["code_versions"]) + 1,
             "files": files,

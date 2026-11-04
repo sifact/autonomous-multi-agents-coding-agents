@@ -30,6 +30,7 @@ packages = ["src/coding_agent"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # lets tests import shared fakes as tests.graph.fakes
 timeout = 180
 norecursedirs = ["tests/fixtures/tasks"]  # sample eval tasks hold hidden tests, not suite tests
 markers = ["docker: tests that need a running Docker daemon and the sandbox image"]

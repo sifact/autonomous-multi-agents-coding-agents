@@ -4,6 +4,7 @@ from coding_agent.agents.coder import make_coder, parse_files, split_files
 from coding_agent.agents.executor import (
     choose_command,
     describe_command,
+    execute_files,
     make_executor,
     policy_flags,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "choose_command",
     "describe_command",
     "enforce_pass_rule",
+    "execute_files",
     "invoke_json",
     "make_architect",
     "make_coder",

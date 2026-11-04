@@ -42,3 +42,16 @@ def test_no_runtime_errors_gives_none():
 def test_empty_raises():
     with pytest.raises(ValueError):
         aggregate([])
+
+
+def test_unpriced_cost_is_none_not_zero():
+    m = aggregate([rec(cost_usd=None), rec(cost_usd=None)])
+    assert m.mean_cost_usd is None
+    assert m.cost_known is False and m.cost_known_count == 0
+
+
+def test_mean_cost_over_known_only():
+    m = aggregate([rec(cost_usd=0.02), rec(cost_usd=None), rec(cost_usd=0.04)])
+    assert m.mean_cost_usd == pytest.approx(0.03)
+    assert m.cost_known_count == 2 and m.cost_known is False  # only some runs priced
+    assert aggregate([rec(cost_usd=0.01)]).cost_known is True

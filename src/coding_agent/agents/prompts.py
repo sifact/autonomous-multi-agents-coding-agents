@@ -140,3 +140,23 @@ Last run: {exec_summary}
 
 Policy flags (advisory static scan): {flags}
 Repairs so far: {repairs}. Replans so far: {replans}."""
+
+# Baseline systems (single-shot / single-agent loop) share the coder's output
+# format (CODER_SYSTEM / DEBUGGER_SYSTEM) so format failures cannot unfairly
+# penalise one system.
+BASELINE_USER = """Task:
+{task}"""
+
+BASELINE_REPAIR_USER = """Task:
+{task}
+
+Current files:
+{files}
+
+Last run: {exec_summary}
+{stdout}
+{stderr}
+
+Fix the program so it meets the task."""
+
+MAX_FIXTURE_PREVIEW_CHARS = 200  # per fixture file, in the task prompt

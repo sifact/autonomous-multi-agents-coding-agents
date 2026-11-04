@@ -16,7 +16,7 @@ class RunRecord:
     attempts: int
     tokens_in: int
     tokens_out: int
-    cost_usd: float
+    cost_usd: float | None  # None when the model has no known price (never 0)
     wall_s: float
 
 
@@ -29,7 +29,9 @@ class Metrics:
     final_pass_rate: float
     runtime_errors_fixed_pct: float | None  # fraction in [0, 1]; None when no run hit a runtime error
     mean_attempts: float
-    mean_cost_usd: float
+    mean_cost_usd: float | None  # mean over runs with a known cost; None if no run has one
+    cost_known_count: int  # runs whose cost was known
+    cost_known: bool  # True only when EVERY run's cost was known
     mean_tokens: float
     mean_wall_s: float
 
@@ -40,13 +42,16 @@ def aggregate(records: list[RunRecord]) -> Metrics:
         raise ValueError("cannot aggregate zero records")
     errored = [r for r in records if r.had_runtime_error]
     fixed_pct = sum(r.fixed_within_3 for r in errored) / len(errored) if errored else None
+    costs = [r.cost_usd for r in records if r.cost_usd is not None]
     return Metrics(
         n=len(records),
         pass_at_1=fmean(r.first_try_pass for r in records),
         final_pass_rate=fmean(r.final_pass for r in records),
         runtime_errors_fixed_pct=fixed_pct,
         mean_attempts=fmean(r.attempts for r in records),
-        mean_cost_usd=fmean(r.cost_usd for r in records),
+        mean_cost_usd=fmean(costs) if costs else None,
+        cost_known_count=len(costs),
+        cost_known=len(costs) == len(records),
         mean_tokens=fmean(r.tokens_in + r.tokens_out for r in records),
         mean_wall_s=fmean(r.wall_s for r in records),
     )
