@@ -5,7 +5,7 @@ from typing import Literal, get_args
 
 from coding_agent.config import Settings
 from coding_agent.llm.base import ChatModel, LLMResponse, Usage
-from coding_agent.llm.groq_model import GroqChatModel
+from coding_agent.llm.groq_model import GroqChatModel, RateLimiter
 from coding_agent.llm.pricing import cost_usd
 
 Role = Literal["planner", "architect", "coder", "reviewer", "debugger"]
@@ -36,9 +36,12 @@ class UsageTracker:
         return sum(u.total for u in self.by_model.values())
 
     @property
-    def total_cost(self) -> float:
-        """Sum of known costs; models with unknown prices count as 0 (see cost_known)."""
-        return sum(c for m, u in self.by_model.items() if (c := cost_usd(m, u)) is not None)
+    def total_cost(self) -> float | None:
+        """Sum of costs, or None when any used model has no known price."""
+        costs = [cost_usd(m, u) for m, u in self.by_model.items()]
+        if any(c is None for c in costs):
+            return None
+        return sum(c for c in costs if c is not None)
 
     @property
     def cost_known(self) -> bool:
@@ -69,9 +72,13 @@ class ModelRouter:
         self._tracker = tracker
         self._all_strong = all_strong
         self._overrides = dict(overrides or {})
+        # One limiter for all models: Groq's rate limit is per API key, not per model.
+        self._limiter = RateLimiter(settings.max_rpm) if settings.max_rpm else None
         self._factory = factory or (
-            lambda model: GroqChatModel(model, settings.groq_api_key)
+            lambda model: GroqChatModel(model, settings.groq_api_key, limiter=self._limiter)
         )
+        self._models: dict[str, ChatModel] = {}
+        self._lock = threading.Lock()
 
     def model_name(self, role: Role) -> str:
         if role not in get_args(Role):
@@ -84,5 +91,8 @@ class ModelRouter:
 
     def for_role(self, role: Role) -> ChatModel:
         name = self.model_name(role)
-        model = self._factory(name)
+        with self._lock:  # reuse one instance per model so limiter state persists
+            if name not in self._models:
+                self._models[name] = self._factory(name)
+            model = self._models[name]
         return _TrackedModel(name, model, self._tracker) if self._tracker else model

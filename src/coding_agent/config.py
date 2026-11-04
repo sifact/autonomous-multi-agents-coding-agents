@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     groq_api_key: str | None = None
+    max_rpm: int | None = Field(default=None, ge=1)  # env MAX_RPM; per-key request cap
     model_cheap: str = "llama-3.1-8b-instant"
     model_strong: str = "llama-3.3-70b-versatile"
     sandbox_image: str = "coding-agent-sandbox:latest"

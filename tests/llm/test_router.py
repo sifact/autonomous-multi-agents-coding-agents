@@ -22,7 +22,7 @@ def test_role_mapping():
         router.for_role(role)
     for role in ("coder", "debugger"):
         router.for_role(role)
-    assert made == ["llama-3.1-8b-instant"] * 3 + ["llama-3.3-70b-versatile"] * 2
+    assert made == ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"]  # cached per model
 
 
 def test_all_strong_ablation():
@@ -73,12 +73,21 @@ def test_tracker_unknown_price_counts_zero_and_flags():
     t = UsageTracker()
     t.add("llama-3.1-8b-instant", Usage(100, 50))
     assert t.total_tokens == 150
-    assert t.total_cost == 0.0
+    assert t.total_cost is None
     assert t.cost_known is False
+
+
+def test_tracker_mixed_priced_and_unpriced_is_none(monkeypatch):
+    monkeypatch.setitem(pricing.PRICES, "m", pricing.Price(1.0, 1.0))
+    t = UsageTracker()
+    t.add("m", Usage(1_000_000, 0))
+    t.add("unpriced", Usage(5, 5))
+    assert t.total_cost is None
 
 
 def test_tracker_empty_cost_known():
     assert UsageTracker().cost_known is True
+    assert UsageTracker().total_cost == 0.0
 
 
 def test_tracker_thread_safe():
@@ -92,3 +101,33 @@ def test_tracker_thread_safe():
     [x.start() for x in threads]
     [x.join() for x in threads]
     assert t.total_tokens == 8 * 1000 * 2
+
+
+def test_settings_max_rpm_from_env(monkeypatch):
+    monkeypatch.setenv("MAX_RPM", "25")
+    assert Settings().max_rpm == 25
+    assert Settings(_env_file=None).max_rpm == 25
+
+
+def test_default_max_rpm_is_none(monkeypatch):
+    monkeypatch.delenv("MAX_RPM", raising=False)
+    assert Settings(_env_file=None).max_rpm is None
+
+
+def test_max_rpm_reaches_default_groq_models_and_is_shared():
+    router = ModelRouter(Settings(groq_api_key="k", max_rpm=7))
+    planner = router.for_role("planner")
+    coder = router.for_role("coder")
+    assert planner._limiter is not None and planner._limiter.max_rpm == 7
+    assert planner._limiter is coder._limiter  # one account-wide limiter
+
+
+def test_same_model_instance_reused_across_for_role_calls():
+    router = ModelRouter(Settings(groq_api_key="k", max_rpm=7))
+    assert router.for_role("coder") is router.for_role("debugger")
+    assert router.for_role("planner") is router.for_role("reviewer")
+
+
+def test_no_limiter_without_max_rpm():
+    router = ModelRouter(Settings(groq_api_key="k", max_rpm=None))
+    assert router.for_role("planner")._limiter is None
