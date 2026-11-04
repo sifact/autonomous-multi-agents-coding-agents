@@ -12,9 +12,13 @@ Route = Literal["coder", "planner", "end"]
 def route_after_review(state: AgentState, settings: Settings) -> Route:
     """Pick the next node.
 
-    ``repairs`` / ``replans`` count attempts already made. With
-    max_repairs=3, repairs 0..2 plus ``fix`` goes to the coder (each bumps the
-    counter via ``apply_verdict_counters``); repairs==3 plus ``fix`` ends.
+    ``repairs`` / ``replans`` count repairs/replans already performed; this
+    reads state after the reviewer and BEFORE any bump. The bump is applied by
+    the coder (on ``fix``) or planner (on ``replan``) via
+    ``apply_verdict_counters``, never by the reviewer, because LangGraph applies
+    a node's update before its conditional edge runs. With max_repairs=3,
+    repairs 0..2 plus ``fix`` goes to the coder; repairs==3 plus ``fix`` ends.
+    Every node bumps ``visits`` (``bump_visit``) so the step budget is real.
     """
     if state["visits"] >= settings.step_budget:
         return "end"
@@ -28,7 +32,10 @@ def route_after_review(state: AgentState, settings: Settings) -> Route:
 
 
 def stop_reason(state: AgentState, settings: Settings) -> str | None:
-    """Human-readable cause when the run ends unsuccessfully, else None."""
+    """Human-readable cause when the run ends unsuccessfully, else None.
+
+    Call only after ``route_after_review`` returned "end".
+    """
     v = state.get("verdict")
     action = getattr(v, "action", None)
     if action == "pass":

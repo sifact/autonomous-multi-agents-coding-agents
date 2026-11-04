@@ -6,6 +6,7 @@ from coding_agent.graph.state import (
     Step,
     Verdict,
     apply_verdict_counters,
+    bump_visit,
     initial_state,
 )
 
@@ -16,6 +17,7 @@ __all__ = [
     "Step",
     "Verdict",
     "apply_verdict_counters",
+    "bump_visit",
     "initial_state",
     "route_after_review",
     "stop_reason",

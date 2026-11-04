@@ -6,6 +6,7 @@ from coding_agent.graph import (
     Step,
     Verdict,
     apply_verdict_counters,
+    bump_visit,
     initial_state,
 )
 from coding_agent.llm import Usage
@@ -52,11 +53,11 @@ def _s(action, repairs=1, replans=1):
 
 
 def test_counters_fix_bumps_repairs_only():
-    assert apply_verdict_counters(_s("fix")) == {"repairs": 2}
+    assert apply_verdict_counters(_s("fix")) == {"repairs": 2, "verdict": None}
 
 
 def test_counters_replan_bumps_replans_and_resets_repairs():
-    assert apply_verdict_counters(_s("replan")) == {"replans": 2, "repairs": 0}
+    assert apply_verdict_counters(_s("replan")) == {"replans": 2, "repairs": 0, "verdict": None}
 
 
 @pytest.mark.parametrize("action", ["pass", "stop"])
@@ -66,3 +67,42 @@ def test_counters_pass_stop_noop(action):
 
 def test_counters_no_verdict_noop():
     assert apply_verdict_counters(initial_state("t")) == {}
+
+
+def test_bump_visit():
+    s = initial_state("t")
+    s["visits"] = 4
+    assert bump_visit(s) == {"visits": 5}
+
+
+def test_counters_never_apply_twice():
+    for action in ("fix", "replan"):
+        s = _s(action)
+        s.update(apply_verdict_counters(s))
+        before = dict(s)
+        assert apply_verdict_counters(s) == {}
+        assert s == before
+
+
+def test_fix_then_replan_sequence():
+    s = _s("fix", repairs=0, replans=0)
+    s.update(apply_verdict_counters(s))
+    s["verdict"] = Verdict(action="replan", reason="r")
+    s.update(apply_verdict_counters(s))
+    assert (s["repairs"], s["replans"], s["verdict"]) == (0, 1, None)
+
+
+def test_verdict_action_normalised():
+    assert Verdict(action=" FIX ", reason="r").action == "fix"
+
+
+def test_verdict_ignores_extra_keys_and_defaults_reason():
+    v = Verdict.model_validate({"action": "pass", "confidence": 0.9})
+    assert v.reason == ""
+
+
+def test_verdict_nonsense_action_raises():
+    with pytest.raises(ValidationError):
+        Verdict.model_validate({"action": 5})
+    with pytest.raises(ValidationError):
+        Verdict.model_validate({"reason": "no action"})

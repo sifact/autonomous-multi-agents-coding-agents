@@ -24,12 +24,19 @@ class Verdict(BaseModel):
     """Reviewer decision. Parseable straight from model JSON."""
 
     action: Literal["pass", "fix", "replan", "stop"]
-    reason: str
+    reason: str = ""
+
+    @field_validator("action", mode="before")
+    @classmethod
+    def _normalise_action(cls, v: object) -> object:
+        # Models vary case and whitespace; an action that is still not one of
+        # the four values fails validation.
+        return v.strip().lower() if isinstance(v, str) else v
 
     @field_validator("reason")
     @classmethod
     def _clip(cls, v: str) -> str:
-        # Models ramble; clip instead of failing so a good action is not lost.
+        # Models ramble; clip an over-long reason instead of failing validation.
         return v[:MAX_REASON_CHARS]
 
 
@@ -41,8 +48,6 @@ class FinalReport(BaseModel):
     explanation: str
     repairs: int
     usage: Usage
-
-    model_config = {"arbitrary_types_allowed": True}
 
 
 class AgentState(TypedDict):
@@ -72,17 +77,36 @@ def initial_state(task: str) -> AgentState:
     )
 
 
+def bump_visit(state: AgentState) -> dict[str, Any]:
+    """Partial update counting one node visit.
+
+    EVERY node (planner, architect, coder, executor, reviewer) includes this
+    in its returned update. With default limits the worst case is about 39
+    visits, so ``step_budget`` (40) is a real backstop, not a decoration.
+    """
+    return {"visits": state["visits"] + 1}
+
+
 def apply_verdict_counters(state: AgentState) -> dict[str, Any]:
-    """Partial update bumping the counters a verdict implies.
+    """Partial update recording the repair/replan the last verdict triggers.
+
+    ``repairs``/``replans`` count work already performed, and the router reads
+    them after the reviewer and BEFORE any bump. So this is called by the node
+    that performs the work: the coder when the last verdict was ``fix``, the
+    planner when it was ``replan``. NEVER call it from the reviewer node:
+    LangGraph applies a node's update before running its conditional edge, so
+    the router would see the bumped count and end one attempt early.
 
     fix -> repairs+1; replan -> replans+1 and repairs reset to 0 (a new plan
-    gets a fresh repair allowance); pass/stop/no verdict -> nothing.
+    gets a fresh repair allowance). Both also return ``verdict: None`` so the
+    same verdict can never be counted twice (the caller reads the verdict
+    before building its update). pass/stop/no verdict return ``{}``.
     """
     v = state.get("verdict")
     if v is None:
         return {}
     if v.action == "fix":
-        return {"repairs": state["repairs"] + 1}
+        return {"repairs": state["repairs"] + 1, "verdict": None}
     if v.action == "replan":
-        return {"replans": state["replans"] + 1, "repairs": 0}
+        return {"replans": state["replans"] + 1, "repairs": 0, "verdict": None}
     return {}

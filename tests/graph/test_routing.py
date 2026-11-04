@@ -6,6 +6,7 @@ from coding_agent.config import Settings
 from coding_agent.graph import (
     Verdict,
     apply_verdict_counters,
+    bump_visit,
     initial_state,
     route_after_review,
     stop_reason,
@@ -69,5 +70,43 @@ def test_exactly_three_repairs_boundary():
     s = st("fix", repairs=2)
     assert route_after_review(s, S) == "coder"
     s.update(apply_verdict_counters(s))
-    assert s["repairs"] == 3
+    assert s["repairs"] == 3 and s["verdict"] is None
+    s["verdict"] = Verdict(action="fix", reason="r")
     assert route_after_review(s, S) == "end"
+
+
+def _run_fixes(s, settings, versions):
+    """Simulate reviewer(fix) -> router -> coder(bump) until the router ends."""
+    while True:
+        s["verdict"] = Verdict(action="fix", reason="r")
+        s.update(bump_visit(s))  # reviewer: visit only, never counters
+        if route_after_review(s, settings) != "coder":
+            return
+        s.update({**bump_visit(s), **apply_verdict_counters(s)})  # coder
+        versions.append(1)
+
+
+def test_loop_exactly_three_repairs_four_versions():
+    s, versions = initial_state("t"), [1]  # first coder run
+    _run_fixes(s, S, versions)
+    assert s["repairs"] == 3 and len(versions) == 4
+
+
+def test_replan_resets_repairs_and_allows_full_fixes_again():
+    s, versions = initial_state("t"), [1]
+    _run_fixes(s, S, versions)
+    s["verdict"] = Verdict(action="replan", reason="r")
+    assert route_after_review(s, S) == "planner"
+    s.update({**bump_visit(s), **apply_verdict_counters(s)})  # planner
+    assert (s["repairs"], s["replans"]) == (0, 1)
+    _run_fixes(s, S, versions)
+    assert s["repairs"] == 3
+
+
+def test_limits_come_from_settings():
+    cfg = Settings(max_repairs=1, max_replans=1, step_budget=5)
+    assert route_after_review(st("fix", repairs=1), cfg) == "end"
+    assert route_after_review(st("fix", repairs=0), cfg) == "coder"
+    assert route_after_review(st("replan", replans=1), cfg) == "end"
+    assert route_after_review(st("fix", visits=5), cfg) == "end"
+    assert route_after_review(st("fix", visits=4), cfg) == "coder"
