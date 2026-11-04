@@ -1,14 +1,8 @@
-import sys
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
-
-from solution import total  # noqa: E402
+from solution import total
 
 
 def test_total_on_fixture():
-    assert abs(total(str(ROOT / "data.csv")) - 1600.0) < 1e-9
+    assert abs(total("data.csv") - 1600.0) < 1e-9
 
 
 def test_total_on_other_file(tmp_path):

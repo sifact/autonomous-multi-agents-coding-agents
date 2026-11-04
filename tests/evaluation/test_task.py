@@ -41,3 +41,9 @@ def test_missing_hidden_tests_raises(tmp_path):
     (tmp_path / "t1" / "task.toml").write_text('category = "x"\n')
     with pytest.raises(ValueError, match="hidden_tests"):
         load_tasks(tmp_path)
+
+
+def test_skips_hidden_and_underscore_dirs(tmp_path):
+    for name in (".git", "__pycache__", "_draft"):
+        (tmp_path / name).mkdir()
+    assert load_tasks(tmp_path) == []

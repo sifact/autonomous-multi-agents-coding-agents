@@ -1,9 +1,4 @@
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from stats import mean  # noqa: E402
+from stats import mean
 
 
 def test_mean():

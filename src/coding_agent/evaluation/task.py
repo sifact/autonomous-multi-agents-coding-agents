@@ -49,5 +49,8 @@ def load_task(task_dir: Path) -> Task:
 
 
 def load_tasks(root: Path) -> list[Task]:
-    """Load every task directory under root, sorted by id."""
-    return [load_task(d) for d in sorted(root.iterdir()) if d.is_dir()]
+    """Load every task directory under root, sorted by id (skips dirs starting with '.' or '_')."""
+    dirs = sorted(
+        d for d in root.iterdir() if d.is_dir() and not d.name.startswith((".", "_"))
+    )
+    return [load_task(d) for d in dirs]

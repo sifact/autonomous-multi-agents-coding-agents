@@ -31,7 +31,7 @@ packages = ["src/coding_agent"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 timeout = 180
-norecursedirs = ["fixtures"]  # sample eval tasks hold hidden tests, not suite tests
+norecursedirs = ["tests/fixtures/tasks"]  # sample eval tasks hold hidden tests, not suite tests
 markers = ["docker: tests that need a running Docker daemon and the sandbox image"]
 
 [tool.ruff]

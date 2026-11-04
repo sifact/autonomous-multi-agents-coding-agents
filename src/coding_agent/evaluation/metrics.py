@@ -27,7 +27,7 @@ class Metrics:
     n: int
     pass_at_1: float
     final_pass_rate: float
-    runtime_errors_fixed_pct: float | None  # None when no run hit a runtime error
+    runtime_errors_fixed_pct: float | None  # fraction in [0, 1]; None when no run hit a runtime error
     mean_attempts: float
     mean_cost_usd: float
     mean_tokens: float
