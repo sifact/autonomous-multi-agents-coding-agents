@@ -215,6 +215,27 @@ def test_no_architect_variant_runs_without_an_architect_call(settings):
     assert out.attempts == 1 and out.files == {"main.py": "print('ok')\n"}
 
 
+@pytest.mark.parametrize("variant,skipped,ran", [
+    ("no-planner", "planner", "architect"), ("no-architect", "architect", "planner"),
+])
+def test_resolved_roles_mark_the_skipped_role(settings, variant, skipped, ran):
+    scripts = lambda: {"planner": [plan()], "architect": [layout()],
+                       "coder": [code("print('ok')")], "reviewer": [verdict("pass")]}
+    system = _variant_system(settings, variant, [], scripts)
+    system.solve(SUM_CSV)
+    roles = system.describe()["resolved_roles"]
+    assert roles[skipped] == "skipped" and roles[ran] == f"fake-{ran}"
+    assert roles["coder"] == "fake-coder"
+
+
+def test_full_variant_resolves_every_role_to_a_model(settings):
+    scripts = lambda: {"planner": [plan()], "architect": [layout()],
+                       "coder": [code("print('ok')")], "reviewer": [verdict("pass")]}
+    system = _variant_system(settings, "full", [], scripts)
+    system.solve(SUM_CSV)
+    assert "skipped" not in system.describe()["resolved_roles"].values()
+
+
 def test_system_output_defaults():
     from coding_agent.llm import Usage
     out = SystemOutput({}, 1, None, False, False, Usage(0, 0), None, 0.0)

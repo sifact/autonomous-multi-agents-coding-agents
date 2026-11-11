@@ -12,6 +12,8 @@ from coding_agent.llm import ModelRouter, Role, Usage, UsageTracker
 from coding_agent.sandbox import Sandbox
 
 GRAPH_VARIANTS = ("full", "no-planner", "no-architect", "all-strong")
+SKIPPED_ROLE = {"no-planner": "planner", "no-architect": "architect"}  # variant -> role
+SKIPPED = "skipped"  # shown instead of a model name for a role the variant does not run
 
 
 class GraphSystem:
@@ -46,6 +48,8 @@ class GraphSystem:
         try:
             router = self._router_factory(tracker)
             self._resolved_roles = {role: router.model_name(role) for role in get_args(Role)}
+            if self.variant in SKIPPED_ROLE:
+                self._resolved_roles[SKIPPED_ROLE[self.variant]] = SKIPPED
             graph = build_graph(
                 router, self._sandbox, self._settings,
                 skip_planner=self.variant == "no-planner",

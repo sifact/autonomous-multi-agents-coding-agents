@@ -105,6 +105,8 @@ def test_real_wiring_writes_a_variant_named_result_file(monkeypatch, settings, t
     (path,) = tmp_path.glob("graph-no-planner-*.json")
     data = json.loads(path.read_text())
     assert data["variant"] == "no-planner" and data["system"] == "graph"
+    assert data["resolved_roles"]["planner"] == "skipped"
+    assert data["resolved_roles"]["architect"] == "fake-architect"
     assert len(data["records"]) == 2 and all(r["error"] is None for r in data["records"])
     assert len(routers) == 3  # the early key check, then one router per task
     assert all(llms["planner"].calls == [] for llms in routers[1:])

@@ -296,6 +296,9 @@ def report(
     readme: Annotated[Path | None, typer.Option(
         help="README to update (default: the repo's)."
     )] = None,
+    tasks_dir: Annotated[Path | None, typer.Option(
+        help="Task folder read by --by-category (default benchmarks/tasks)."
+    )] = None,
 ) -> None:
     """Print the results table from saved benchmark runs. No API key needed."""
     folder = results_dir or deps.results_dir()
@@ -308,13 +311,19 @@ def report(
             EXIT_BAD_INPUT,
         )
     markdown = render_markdown(
-        results, by_category=by_category, all_runs=all_runs, tasks_dir=deps.tasks_dir()
+        results, by_category=by_category, all_runs=all_runs,
+        tasks_dir=tasks_dir or deps.tasks_dir(),
     )
     show(markdown)
     if write_readme:
         target = readme or deps.readme_path()
+        canonical = markdown
+        if all_runs or by_category:
+            show("note: --all and --by-category are not written to the README "
+                 "(it always gets the latest-per-system table).")
+            canonical = render_markdown(results)
         try:
-            write_readme_block(target, markdown)
+            write_readme_block(target, canonical)
         except (ReadmeMarkerError, OSError) as exc:
             raise _fail(f"README not updated: {exc}", EXIT_FAILED) from exc
         show(f"README results block updated: {target}")

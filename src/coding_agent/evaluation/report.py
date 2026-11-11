@@ -13,20 +13,25 @@ from coding_agent.evaluation.results_io import (
     load_results,
     select_latest,
 )
+from coding_agent.evaluation.systems import SKIPPED, SKIPPED_ROLE
 from coding_agent.evaluation.verdict import compare
 
 __all__ = ["ResultFileWarning", "compare", "load_results", "render_markdown"]
 
 COLUMNS = (
-    "System", "Tasks", "Runs", "pass@1", "Final pass", "Budget-matched pass",
+    "System", "Tasks", "Runs", "pass@1", "Final pass*", "Budget-matched pass",
     "Runtime errors fixed (<=3 repairs)", "Mean attempts", "Mean tokens",
     "Mean cost (per task)", "Mean wall time", "Errors",
+)
+TABLE_FOOTNOTE = (
+    "\\* retry-confounded: the graph can try more times than the loop; "
+    "compare Budget-matched pass"
 )
 READING_GUIDE = """\
 **How to read this table**
 
 - **pass@1**: share of runs whose first generated program passes the hidden tests.
-- **Final pass**: share that pass after the system's own repairs or replans. The graph can \
+- **Final pass***: share that pass after the system's own repairs or replans. The graph can \
 retry more often than the single agent, so this number is confounded by retry budget.
 - **Budget-matched pass**: grades the generation at the shared retry budget; this is the fair \
 comparison.
@@ -77,7 +82,9 @@ def _row(result: ResultFile, all_runs: bool) -> str:
 
 
 def _detail(result: ResultFile, all_runs: bool) -> str:
-    models = result.resolved_roles or result.models
+    models = dict(result.resolved_roles or result.models)
+    if result.variant in SKIPPED_ROLE:  # never show a model name for a role that did not run
+        models[SKIPPED_ROLE[result.variant]] = SKIPPED
     model_text = ", ".join(f"{k}={v}" for k, v in models.items()) or "unknown"
     s = result.settings
     budgets = ", ".join(
@@ -99,7 +106,7 @@ def render_markdown(
     out = ["### Ablation results", "", "| " + " | ".join(COLUMNS) + " |",
            "|" + "---|" * len(COLUMNS)]
     out += [_row(r, all_runs) for r in rows]
-    out += ["", READING_GUIDE, "", "**Run details**", ""]
+    out += ["", TABLE_FOOTNOTE, "", READING_GUIDE, "", "**Run details**", ""]
     out += [_detail(r, all_runs) for r in rows]
     notes = list(dict.fromkeys(r.budget_note for r in rows if r.budget_note))
     for note in notes:

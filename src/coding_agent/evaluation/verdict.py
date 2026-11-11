@@ -1,56 +1,146 @@
 """A conservative plain-language verdict: did the graph beat the baselines?
 
-Why conservative: a benchmark of a few dozen tasks cannot separate small
-differences from luck. A difference is only called when BOTH systems have at
-least ``MIN_RUNS`` runs and the gap is at least ``MIN_POINTS`` percentage points
-AND ``MIN_TASKS`` runs' worth. Everything else reads "no clear difference". The
-sentence always carries the sample sizes. It is not a significance test.
+Conservative by construction:
+
+- **Paired by task.** Two systems are compared only on the task ids both ran, never on
+  percentages over different task sets. Per task the score is the mean over that task's
+  repeats, so repeats cannot masquerade as extra tasks.
+- **Crashes are not quality.** A task where either side had a crashed run (infrastructure
+  failure) is left out and reported. If more than ``MAX_CRASH_SHARE`` of the shared tasks
+  must be left out, or a system crashed on every run, the pair is "not comparable".
+- **Gate on distinct tasks.** At least ``MIN_SHARED_TASKS`` shared, non-crashed tasks are
+  needed; fewer is "no clear difference" (and, honestly, a smoke test: the 10-task fast
+  subset can never pass this gate).
+- **Two conditions for "better"/"worse".** The mean paired difference must be at least
+  ``MIN_POINTS`` percentage points AND an exact two-sided sign test on the non-tied tasks
+  must give p < ``ALPHA``. Anything else is "no clear difference".
+
+Every sentence carries the shared-task count, runs per system, wins/losses/ties, the
+difference and the token multiple, so a quality gain is never shown without its cost.
 """
+from math import comb
+from statistics import fmean
+
+from coding_agent.evaluation.metrics import RunRecord
 from coding_agent.evaluation.results_io import DEFAULT_VARIANT, ResultFile
 
-MIN_RUNS = 20
+MIN_SHARED_TASKS = 20
 MIN_POINTS = 5.0
-MIN_TASKS = 2
+ALPHA = 0.05
+MAX_CRASH_SHARE = 0.10
 BASELINES = ("single_agent", "single_shot")
+CRASH_NOTE = "infrastructure failures, not agent quality"
 
 
-def _judge(g: float, b: float, n_g: int, n_b: int) -> tuple[str, str]:
-    """``(outcome, detail)`` with outcome in better / worse / unclear / too_few."""
-    points = round((g - b) * 100, 6)
-    shown = f"{g:.1%} vs {b:.1%}"
-    if min(n_g, n_b) < MIN_RUNS:
-        return "too_few", (
-            f"{shown}; only {n_g} vs {n_b} runs, at least {MIN_RUNS} per system are needed"
-        )
-    tasks_apart = round(abs(g - b) * min(n_g, n_b), 6)
-    if abs(points) < MIN_POINTS or tasks_apart < MIN_TASKS:
-        return "unclear", (
-            f"{shown}, {points:+.1f} points; {n_g} vs {n_b} runs; a difference needs at least "
-            f"{MIN_POINTS:g} points and {MIN_TASKS} tasks"
-        )
-    return ("better" if points > 0 else "worse"), (
-        f"{shown}, {points:+.1f} points; {n_g} vs {n_b} runs"
-    )
+def sign_test_p(wins: int, losses: int) -> float:
+    """Exact two-sided sign test p-value on the non-tied tasks (1.0 when there are none)."""
+    n = wins + losses
+    if n == 0:
+        return 1.0
+    tail = sum(comb(n, i) for i in range(min(wins, losses) + 1))
+    return min(1.0, 2 * tail / 2**n)
 
 
-def _metric_line(name: str, g: float, b: float, n_g: int, n_b: int, base: str) -> tuple[str, str]:
-    outcome, detail = _judge(g, b, n_g, n_b)
-    if outcome in ("better", "worse"):
-        return outcome, f"- {name}: graph is {outcome} than {base} ({detail})."
-    return outcome, f"- {name}: no clear difference between graph and {base} ({detail})."
+def _judge(diff_pp: float, wins: int, losses: int) -> str:
+    """``better`` / ``worse`` / ``unclear``: big enough AND significant AND same direction."""
+    if sign_test_p(wins, losses) >= ALPHA:
+        return "unclear"
+    diff = round(diff_pp, 6)
+    if diff >= MIN_POINTS and wins > losses:
+        return "better"
+    if diff <= -MIN_POINTS and losses > wins:
+        return "worse"
+    return "unclear"
 
 
-def _cost_line(graph: ResultFile, base: ResultFile) -> str:
+def _by_task(result: ResultFile) -> dict[str, list[RunRecord]]:
+    tasks: dict[str, list[RunRecord]] = {}
+    for r in result.records:
+        tasks.setdefault(r.task_id, []).append(r)
+    return tasks
+
+
+def _tokens(graph: ResultFile, base: ResultFile) -> str:
     g, b = graph.metrics.mean_tokens, base.metrics.mean_tokens
     if g is None or not b:
-        return f"- Cost: tokens cannot be compared with {base.label} (no error-free runs)."
-    return (f"- Cost: graph used about {g / b:.1f}x the tokens of {base.label} per task "
-            f"(mean {g:,.0f} vs {b:,.0f}).")
+        return "token cost not comparable"
+    return f"at {g / b:.1f}x the tokens"
+
+
+def _metric_line(
+    name: str, attr: str, ids: list[str], gt: dict, bt: dict, graph: ResultFile,
+    base: ResultFile,
+) -> tuple[str, str]:
+    diffs = [
+        fmean(getattr(r, attr) for r in gt[t]) - fmean(getattr(r, attr) for r in bt[t])
+        for t in ids
+    ]
+    wins, losses = sum(d > 0 for d in diffs), sum(d < 0 for d in diffs)
+    ties = len(diffs) - wins - losses
+    diff_pp = fmean(diffs) * 100
+    outcome = _judge(diff_pp, wins, losses)
+    verdict = (f"graph is {outcome} than {base.label}" if outcome != "unclear"
+               else f"no clear difference between graph and {base.label}")
+    runs_g, runs_b = sum(len(gt[t]) for t in ids), sum(len(bt[t]) for t in ids)
+    detail = (
+        f"{diff_pp:+.1f} pp; {len(ids)} shared tasks, {runs_g} vs {runs_b} runs; "
+        f"{wins} wins, {losses} losses, {ties} ties; sign test p={sign_test_p(wins, losses):.3f}"
+    )
+    return outcome, f"- {name}: {verdict} ({detail}) {_tokens(graph, base)}."
+
+
+def _compare_one(graph: ResultFile, base: ResultFile) -> list[str]:
+    gt, bt = _by_task(graph), _by_task(base)
+    prefix = f"- graph vs {base.label}:"
+    runs = graph.metrics.n + base.metrics.n
+    if graph.metrics.n_errors == graph.metrics.n or base.metrics.n_errors == base.metrics.n:
+        crashed = graph.metrics.n_errors + base.metrics.n_errors
+        return [f"{prefix} not comparable: {crashed} of {runs} runs crashed ({CRASH_NOTE})."]
+    shared = sorted(set(gt) & set(bt))
+    sets = ""
+    if len(shared) != len(gt) or len(shared) != len(bt):
+        sets = (f" graph and {base.label} ran on different task sets "
+                f"({len(shared)} shared of {len(gt)} vs {len(bt)});")
+    if not shared:
+        text = f"{prefix} no clear difference: no shared tasks;{sets} results cannot be paired."
+        return [text]
+    bad = [t for t in shared if any(r.error for r in gt[t] + bt[t])]
+    if len(bad) / len(shared) > MAX_CRASH_SHARE:
+        crashed = sum(bool(r.error) for t in shared for r in gt[t] + bt[t])
+        shared_runs = sum(len(gt[t]) + len(bt[t]) for t in shared)
+        return [f"{prefix} not comparable: {crashed} of {shared_runs} runs crashed ({CRASH_NOTE})."]
+    usable = [t for t in shared if t not in bad]
+    lines: list[str] = []
+    if bad:
+        plural = "tasks" if len(bad) != 1 else "task"
+        verb = "were" if len(bad) != 1 else "was"
+        lines.append(f"- {len(bad)} {plural} with crashed runs {verb} excluded from the "
+                     f"comparison with {base.label}.")
+    if len(usable) < MIN_SHARED_TASKS:
+        text = (f"{prefix} no clear difference: only {len(usable)} shared tasks (need at least "
+                f"{MIN_SHARED_TASKS});{sets} results on so few tasks are a smoke test only.")
+        return [text, *lines]
+    final, text = _metric_line(
+        "Final pass", "final_pass", usable, gt, bt, graph, base)
+    matched, text2 = _metric_line(
+        "Budget-matched pass", "matched_budget_pass", usable, gt, bt, graph, base)
+    lines = [text, text2, *lines]
+    if final == "better" and matched != "better":
+        lines.append(
+            f"- The gain disappears when the retry budget is matched, so the final-pass gain "
+            f"over {base.label} may come from extra retries rather than better agents."
+        )
+    elif final != matched:
+        lines.append(
+            f"- Final pass and budget-matched pass disagree against {base.label}; treat this "
+            "as no clear result."
+        )
+    return lines
 
 
 def compare(results: list[ResultFile]) -> str:
     """Say, from the numbers only, how the full graph did against each baseline."""
-    head = "Verdict (from the numbers above only; this is not a significance test):"
+    head = "Verdict (paired by task, from the numbers above only):"
     if not results:
         return f"{head}\n- No results to compare."
     latest: dict[str, ResultFile] = {}
@@ -63,23 +153,8 @@ def compare(results: list[ResultFile]) -> str:
         return f"{head}\n- No graph result (full variant) to compare."
     lines = [head]
     for name in BASELINES:
-        base = latest.get(name)
-        if base is None:
-            continue
-        gm, bm = graph.metrics, base.metrics
-        final, text = _metric_line(
-            "Final pass", gm.final_pass_rate, bm.final_pass_rate, gm.n, bm.n, name)
-        lines.append(text)
-        matched, text = _metric_line(
-            "Budget-matched pass", gm.matched_budget_pass_rate, bm.matched_budget_pass_rate,
-            gm.n, bm.n, name)
-        lines.append(text)
-        lines.append(_cost_line(graph, base))
-        if final == "better" and matched != "better":
-            lines.append(
-                f"- The graph's final-pass gain over {name} is not there at a matched retry "
-                "budget, so it may come from extra retries rather than better agents."
-            )
+        if name in latest:
+            lines += _compare_one(graph, latest[name])
     if len(lines) == 1:
         lines.append("- No baseline result (single_agent or single_shot) to compare against.")
     return "\n".join(lines)

@@ -92,3 +92,29 @@ def test_write_readme_refuses_broken_markers(results, tmp_path):
                               "--readme", str(readme)])
     assert out.exit_code == 1 and "markers" in out.output
     assert readme.read_text() == f"{START}\nnope\n"
+
+
+def test_readme_only_receives_the_canonical_latest_table(results, tmp_path, monkeypatch):
+    monkeypatch.setattr(deps, "tasks_dir", lambda: TASKS)
+    readme = tmp_path / "README.md"
+    readme.write_text(f"# T\n\n{START}\nx\n{END}\n")
+    write(results, "a.json", payload("graph", runs("graph", 2, 0), ts="2026-11-01T00:00:00+00:00"))
+    write(results, "b.json", payload("graph", runs("graph", 2, 2), ts="2026-11-05T00:00:00+00:00"))
+    base = ["report", "--results-dir", str(results), "--write-readme", "--readme", str(readme)]
+    runner.invoke(app, base)
+    canonical = readme.read_text()
+    out = runner.invoke(app, [*base, "--all", "--by-category"])
+    assert out.exit_code == 0 and readme.read_text() == canonical
+    assert "not written to the README" in out.output
+    assert "By category" not in canonical and "graph ·" not in canonical
+    assert "By category" in out.output  # still printed to the terminal
+
+
+def test_tasks_dir_option_feeds_the_breakdown(results, tmp_path):
+    write(results, "g.json", payload("graph", [rec("fix_mean", "graph", final=True)]))
+    out = runner.invoke(app, ["report", "--results-dir", str(results), "--by-category",
+                              "--tasks-dir", str(TASKS)])
+    assert "bug_fix" in out.output
+    missing = runner.invoke(app, ["report", "--results-dir", str(results), "--by-category",
+                                  "--tasks-dir", str(tmp_path / "nope")])
+    assert missing.exit_code == 0 and "Breakdown skipped" in missing.output

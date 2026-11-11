@@ -5,7 +5,7 @@ from .helpers import TASKS
 from .report_helpers import payload, rec, runs, write
 
 HEADER = (
-    "| System | Tasks | Runs | pass@1 | Final pass | Budget-matched pass | "
+    "| System | Tasks | Runs | pass@1 | Final pass* | Budget-matched pass | "
     "Runtime errors fixed (<=3 repairs) | Mean attempts | Mean tokens | Mean cost (per task) | "
     "Mean wall time | Errors |"
 )
@@ -116,3 +116,45 @@ def test_breakdown_skipped_cleanly_when_task_dir_missing(tmp_path):
     write(tmp_path, "g.json", payload("graph", runs("graph", 2, 1)))
     md = render_markdown(load_results(tmp_path), by_category=True, tasks_dir=tmp_path / "nope")
     assert "Breakdown skipped" in md and "### By category" not in md
+
+
+def test_final_pass_footnote_explains_the_retry_confound(tmp_path):
+    write(tmp_path, "g.json", payload("graph", runs("graph", 2, 1)))
+    md = render_markdown(load_results(tmp_path))
+    assert (
+        "* retry-confounded: the graph can try more times than the loop; "
+        "compare Budget-matched pass" in md
+    )
+    assert md.index("retry-confounded") < md.index("**How to read this table**")
+
+
+def test_skipped_role_is_shown_as_skipped_in_run_details(tmp_path):
+    data = payload("graph", runs("graph", 2, 1), variant="no-planner")
+    data["resolved_roles"] = {"planner": "m-small", "architect": "m-small", "coder": "m-big"}
+    write(tmp_path, "np.json", data)
+    other = payload("graph", runs("graph", 2, 1), variant="no-architect")  # no resolved_roles
+    write(tmp_path, "na.json", other)
+    md = render_markdown(load_results(tmp_path))
+    detail = next(ln for ln in md.splitlines() if ln.startswith("- graph (no planner)"))
+    assert "planner=skipped" in detail and "planner=m-small" not in detail
+    assert "architect=m-small" in detail and "coder=m-big" in detail
+    detail = next(ln for ln in md.splitlines() if ln.startswith("- graph (no architect)"))
+    assert "architect=skipped" in detail
+
+
+def test_naive_timestamp_file_is_skipped_with_a_warning_not_a_crash(tmp_path):
+    write(tmp_path, "naive.json", payload("graph", runs("graph", 2, 1), ts="2026-11-02T10:00:00"))
+    write(tmp_path, "aware.json", payload("graph", runs("graph", 2, 2)))
+    warnings = []
+    results = load_results(tmp_path, on_warning=warnings.append)
+    assert len(results) == 1 and "naive.json" in warnings[0] and "timezone" in warnings[0]
+    assert "| graph | 2 | 2 | 100.0% |" in render_markdown(results)
+
+
+def test_unknown_group_is_explained_in_a_footnote(tmp_path):
+    write(tmp_path, "g.json", payload("graph", [rec("ghost", "graph", final=True)]))
+    md = render_markdown(load_results(tmp_path), by_category=True, tasks_dir=TASKS)
+    assert "`unknown`" in md and "not found in the task directory" in md
+    write(tmp_path, "g.json", payload("graph", [rec("fix_mean", "graph", final=True)]))
+    md = render_markdown(load_results(tmp_path), by_category=True, tasks_dir=TASKS)
+    assert "not found in the task directory" not in md

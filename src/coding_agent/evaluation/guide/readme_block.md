@@ -2,8 +2,8 @@
 
 Keeps the measured results in a marked block of the README.
 
-- The block lives between `<!-- RESULTS:START -->` and `<!-- RESULTS:END -->`; `replace_block` swaps only the text between them.
-- Replacing is idempotent: the same table always gives byte-identical README text, because the report has no timestamps of its own.
-- With no markers at all it creates a `## Results` section just before `## Status` (or at the end of the file) holding the block.
-- Exactly one start marker followed by one end marker is accepted; a lone, reversed or duplicated marker raises `ReadmeMarkerError` and nothing is written.
-- `write_readme_block` writes a temp file in the same directory, copies the file mode and renames it over the README, so an interrupted write never leaves a half-written file.
+- The block lives between `<!-- RESULTS:START -->` and `<!-- RESULTS:END -->`; a marker counts only when it is alone on its line and outside a ``` or ~~~ code fence, so quoted or example markers are ignored.
+- With no markers it creates a `## Results` section just before `## Status` (or at the end); exactly one start followed by one end is replaced, and a lone, reversed or duplicated marker raises `ReadmeMarkerError` with nothing written.
+- The file is read and written as bytes and the block uses the file's own newline style, so a CRLF README stays CRLF and the text outside the block is byte-identical.
+- Replacing is idempotent: the same table always gives the same README, because the report has no timestamps of its own.
+- A symlinked README is written through to its target and stays a link; the write goes to a temp file beside the target, copies the mode and renames over it, so an interrupt never leaves half a file.

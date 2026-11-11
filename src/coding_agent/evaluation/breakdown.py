@@ -35,6 +35,10 @@ def _table(title: str, column: str, rows: list[ResultFile], index: int,
             vals = cells[group].get(i)
             row.append(f"{sum(vals) / len(vals):.1%} ({len(vals)})" if vals else "n/a")
         out.append("| " + " | ".join(row) + " |")
+    if UNKNOWN in cells:
+        note = (f"`{UNKNOWN}`: task ids not found in the task directory (a different task "
+                "set than the one on disk, or the task was renamed).")
+        out += ["", note]
     return out + [""]
 
 

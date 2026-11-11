@@ -83,6 +83,8 @@ def _parse(path: Path, data: dict[str, Any]) -> ResultFile:
     if not data["records"]:
         raise ValueError("no records")
     timestamp = datetime.fromisoformat(str(data["timestamp"]))
+    if timestamp.tzinfo is None:
+        raise ValueError("timestamp has no timezone offset, so it cannot be ordered")
     records = [_record(r) for r in data["records"]]
     return ResultFile(
         path=path, system=data["system"], variant=data.get("variant") or DEFAULT_VARIANT,
