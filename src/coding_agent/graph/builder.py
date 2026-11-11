@@ -81,22 +81,29 @@ def build_graph(router: ModelRouter, sandbox: Sandbox, settings: Settings) -> Co
 
 
 def stream_task(
-    graph: CompiledStateGraph, task: str, fixtures: dict[str, str] | None = None
+    graph: CompiledStateGraph, task: str, fixtures: dict[str, str] | None = None,
+    config: dict[str, Any] | None = None,
 ) -> Iterator[tuple[str, dict[str, Any]]]:
-    """Yield ``(node_name, partial_update)`` as each node finishes, for live UIs."""
-    for chunk in graph.stream(initial_state(task, fixtures), stream_mode="updates"):
+    """Yield ``(node_name, partial_update)`` as each node finishes, for live UIs.
+
+    ``config`` is an optional LangChain run config (callbacks, metadata); tracing passes
+    ``TraceRun.config`` here so every node and model call lands in one trace.
+    """
+    for chunk in graph.stream(initial_state(task, fixtures), config, stream_mode="updates"):
         yield from chunk.items()
 
 
 def run_graph(
-    graph: CompiledStateGraph, task: str, fixtures: dict[str, str] | None = None
+    graph: CompiledStateGraph, task: str, fixtures: dict[str, str] | None = None,
+    config: dict[str, Any] | None = None,
 ) -> AgentState:
     """Run to completion and return the final state (events, code versions, final)."""
-    return graph.invoke(initial_state(task, fixtures))
+    return graph.invoke(initial_state(task, fixtures), config)
 
 
 def run_task(
-    graph: CompiledStateGraph, task: str, fixtures: dict[str, str] | None = None
+    graph: CompiledStateGraph, task: str, fixtures: dict[str, str] | None = None,
+    config: dict[str, Any] | None = None,
 ) -> FinalReport:
     """Run to completion and return just the FinalReport."""
-    return run_graph(graph, task, fixtures)["final"]
+    return run_graph(graph, task, fixtures, config)["final"]

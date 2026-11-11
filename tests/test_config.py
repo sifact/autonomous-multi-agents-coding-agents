@@ -29,3 +29,22 @@ def test_api_key_is_secret_in_repr_and_str():
     s = Settings(groq_api_key="gsk_SENTINEL_xyz", _env_file=None)
     assert "gsk_SENTINEL_xyz" not in repr(s) and "gsk_SENTINEL_xyz" not in str(s)
     assert s.groq_api_key.get_secret_value() == "gsk_SENTINEL_xyz"
+
+
+def test_langfuse_settings_default_off(monkeypatch):
+    for k in ("LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_HOST"):
+        monkeypatch.delenv(k, raising=False)
+    s = Settings(_env_file=None)
+    assert s.langfuse_public_key is None and s.langfuse_secret_key is None
+    assert s.langfuse_host == "https://cloud.langfuse.com"
+
+
+def test_langfuse_env_names_and_secrecy(monkeypatch):
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-PUBSENTINEL")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-SECSENTINEL")
+    monkeypatch.setenv("LANGFUSE_HOST", "http://localhost:3000")
+    s = Settings(_env_file=None)
+    assert s.langfuse_host == "http://localhost:3000"
+    assert s.langfuse_secret_key.get_secret_value() == "sk-lf-SECSENTINEL"
+    shown = repr(s) + str(s)
+    assert "PUBSENTINEL" not in shown and "SECSENTINEL" not in shown
