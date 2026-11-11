@@ -4,7 +4,7 @@ Give it a coding task in plain English. A team of agents plans it, designs the f
 
 Built with [LangGraph](https://langchain-ai.github.io/langgraph/) and Groq-hosted models. The point of the project is not only that it works, but that the claim "multiple agents help" is **measured**: a hidden-test benchmark compares the full agent graph against a single-shot LLM and a single looping agent.
 
-> **Status: work in progress.** The sandbox, the agent graph, the evaluation harness and most of the benchmark are built and tested. The command-line tool, tracing, the web UI and the measured results are next. See [Status](#status) for exactly what exists today. No benchmark numbers are published yet, because they have not been run yet.
+> **Status: work in progress.** The sandbox, the agent graph, the evaluation harness and the full 46-task benchmark are built and tested. The command-line tool, tracing, the web UI and the measured results are next. See [Status](#status) for exactly what exists today. No benchmark numbers are published yet, because they have not been run yet.
 
 ---
 
@@ -101,9 +101,17 @@ The tasks are 17 easy, 19 medium and 10 hard. A 10-task fast subset (`benchmarks
 | Measured results and ablation table | Planned (needs a Groq key) |
 | CI with an evaluation badge | Planned |
 | Web UI that streams the agent's steps | Planned |
-| Architecture diagram and a demo GIF of a self-repair | Planned |
+| Architecture diagrams (high-level and low-level) | Done: see [Design diagrams](#design-diagrams) |
+| Demo GIF of a self-repair | Planned |
 
 The test suite (380 tests) passes locally, including the tests that run against the real sandbox.
+
+## Design diagrams
+
+Two [Excalidraw](https://excalidraw.com) diagrams explain how the system fits together. Open them in the Excalidraw VS Code extension or at excalidraw.com.
+
+- [High-level system design](docs/system-design-high-level.excalidraw): the agent team, the services under it, how the benchmark measures it, and what is still to come.
+- [Low-level system design](docs/system-design-low-level.excalidraw): the code map, the graph's state and routing rules, the executor-to-sandbox path, the LLM layer and the evaluation pipeline.
 
 ## Run it
 
