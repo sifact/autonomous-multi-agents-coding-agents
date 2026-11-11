@@ -15,6 +15,8 @@ from coding_agent.cli_support.errors import AUTH_MESSAGE, is_auth_error
 from coding_agent.cli_support.format import metrics_lines, money, record_line, sanitize
 from coding_agent.cli_support.printer import StepPrinter
 from coding_agent.evaluation import aggregate, load_fast_subset, load_tasks, run_benchmark
+from coding_agent.evaluation.readme_block import ReadmeMarkerError, write_readme_block
+from coding_agent.evaluation.report import load_results, render_markdown
 from coding_agent.graph import build_graph, stream_task
 from coding_agent.llm import MissingApiKeyError, UsageTracker
 from coding_agent.sandbox import PathEscapeError, write_files
@@ -254,6 +256,41 @@ def safety() -> None:
 
 
 @app.command()
-def report() -> None:
-    """Build the results report (not implemented yet)."""
-    typer.echo("Not implemented yet: see the README roadmap.")
+def report(
+    results_dir: Annotated[Path | None, typer.Option(
+        help="Folder with the result JSON files (default benchmarks/results)."
+    )] = None,
+    all_runs: Annotated[bool, typer.Option(
+        "--all", help="One row per result file instead of the latest per system."
+    )] = False,
+    by_category: Annotated[bool, typer.Option(
+        help="Add final-pass tables by task category and difficulty."
+    )] = False,
+    write_readme: Annotated[bool, typer.Option(
+        help="Replace the results block in the README with this report."
+    )] = False,
+    readme: Annotated[Path | None, typer.Option(
+        help="README to update (default: the repo's)."
+    )] = None,
+) -> None:
+    """Print the results table from saved benchmark runs. No API key needed."""
+    folder = results_dir or deps.results_dir()
+    results = load_results(
+        folder, on_warning=lambda m: typer.echo(sanitize(f"warning: {m}"), err=True)
+    ) if folder.is_dir() else []
+    if not results:
+        raise _fail(
+            f"No result files found in {folder}. Run `agent eval --system ...` first.",
+            EXIT_BAD_INPUT,
+        )
+    markdown = render_markdown(
+        results, by_category=by_category, all_runs=all_runs, tasks_dir=deps.tasks_dir()
+    )
+    show(markdown)
+    if write_readme:
+        target = readme or deps.readme_path()
+        try:
+            write_readme_block(target, markdown)
+        except (ReadmeMarkerError, OSError) as exc:
+            raise _fail(f"README not updated: {exc}", EXIT_FAILED) from exc
+        show(f"README results block updated: {target}")

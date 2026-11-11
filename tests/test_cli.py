@@ -51,12 +51,6 @@ def test_version():
     assert result.exit_code == 0 and "coding-agent" in result.output
 
 
-def test_report_is_a_registered_stub():
-    result = runner.invoke(app, ["report"])
-    assert result.exit_code == 0
-    assert "Not implemented yet: see the README roadmap." in result.output
-
-
 @pytest.mark.parametrize("task", ["", "   \n ", "x" * 4001])
 def test_bad_task_exits_2_and_builds_nothing(boom, task):
     result = runner.invoke(app, ["run", task])

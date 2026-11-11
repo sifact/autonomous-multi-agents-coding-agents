@@ -16,7 +16,7 @@ from coding_agent.evaluation import (
     SingleShot,
     run_safety_suite,  # noqa: F401 - re-exported so tests can patch it here
 )
-from coding_agent.evaluation.runner import REPO_ROOT
+from coding_agent.evaluation.runner import DEFAULT_OUT_DIR, REPO_ROOT
 from coding_agent.evaluation.systems import System
 from coding_agent.llm import ModelRouter, UsageTracker
 from coding_agent.sandbox import DockerSandbox
@@ -46,6 +46,15 @@ def load_settings() -> Settings:
 def tasks_dir() -> Path:
     """Benchmark tasks, resolved from the repo root so the CWD does not matter."""
     return REPO_ROOT / "benchmarks" / "tasks"
+
+
+def results_dir() -> Path:
+    """Where ``agent eval`` saves result files and ``agent report`` reads them."""
+    return DEFAULT_OUT_DIR
+
+
+def readme_path() -> Path:
+    return REPO_ROOT / "README.md"
 
 
 def make_router(
