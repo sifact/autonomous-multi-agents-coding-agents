@@ -110,7 +110,7 @@ No results published yet. The benchmark runs need a Groq API key and have not be
 | Architecture diagrams (high-level and low-level) | Done: see [Design diagrams](#design-diagrams) |
 | Demo GIF of a self-repair | Planned |
 
-The test suite (486 tests) passes locally, including the tests that run against the real sandbox.
+The test suite (565 tests) passes locally, including the tests that run against the real sandbox.
 
 ## Design diagrams
 
@@ -146,11 +146,17 @@ uv run agent run "Write a script that prints the first 10 primes"
 # benchmark a system on the 10-task fast subset (or --subset full); also: single_shot, single_agent
 uv run agent eval --system graph --subset fast
 
+# ablations of the graph: skip a role or use the strong model everywhere
+uv run agent eval --system graph --variant no-planner --subset fast
+
+# print the results table from the saved runs (no API key needed)
+uv run agent report
+
 # check that the sandbox contains the 7 attacks (no API key needed)
 uv run agent safety
 ```
 
-Useful options: `agent run --out DIR` (where the files go; default `./agent_out/<UTC time>/`, which is git-ignored), `--quiet` (only the final summary), `--verbose` (print the full code of every version), `--all-strong` (graph only: strong model for every role; the two baselines already use the strong coder, so it changes nothing for them), `--max-rpm N`. `agent eval` also takes `--repeats`, `--max-runs-per-min` and `--out-dir`.
+Useful options: `agent run --out DIR` (where the files go; default `./agent_out/<UTC time>/`, which is git-ignored), `--quiet` (only the final summary), `--verbose` (print the full code of every version), `--all-strong` (graph only: strong model for every role, the same as `--variant all-strong`; the two baselines already use the strong coder, so it changes nothing for them), `--max-rpm N`. `agent eval` also takes `--repeats`, `--max-runs-per-min`, `--out-dir` and `--variant {full,no-planner,no-architect,all-strong}` (graph only). The variants show what each part adds: `no-planner` and `no-architect` replace that role with a pass-through that makes no model call (the coder then gets the task text as its only step, or chooses the files itself), and `all-strong` uses the strong model for every role. Each variant is saved as `graph-<variant>-<time>.json` with `variant` recorded inside, and `agent report` shows it as its own row (`graph (no planner)` and so on). These switches are tested with scripted models; no ablation has been run on real models yet, so no numbers are claimed.
 
 `agent run` and `agent eval` call Groq, so they need `GROQ_API_KEY`. `agent safety` and the test suite do not. Exit codes: 0 success, 1 the run failed, 2 bad input, 3 setup problem (no key, a key Groq rejects, Docker not running, sandbox image not built, or the output files could not be written), 130 interrupted with Ctrl-C. `agent eval` writes one JSON result file per run to `benchmarks/results/` (or `--out-dir`) and prints its path, also after a crash or Ctrl-C. `agent report` needs no key: it reads the result files, prints the ablation table (one row per system, latest file each; `--all` lists every file, `--by-category` adds pass rates by task category and difficulty, `--results-dir DIR` picks the folder) and a cautious verdict, and `--write-readme` rewrites the Results block above. It exits 2 when there are no result files. See `agent --help` for all options.
 
