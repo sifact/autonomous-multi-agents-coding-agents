@@ -87,12 +87,17 @@ def make_sandbox(settings: Settings) -> DockerSandbox:
 
 
 def build_system(
-    name: str, settings: Settings, sandbox: DockerSandbox, all_strong: bool = False
+    name: str, settings: Settings, sandbox: DockerSandbox, all_strong: bool = False,
+    variant: str = "full",
 ) -> System:
-    """The eval system exactly as the runner expects it (baselines use the strong model)."""
+    """The eval system exactly as the runner expects it (baselines use the strong model).
+
+    ``variant`` only applies to the graph (see ``GraphSystem``); the CLI has already made
+    ``all_strong`` and ``variant="all-strong"`` agree.
+    """
     if name == "graph":
         return GraphSystem(lambda tracker: make_router(settings, tracker, all_strong),
-                           sandbox, settings)
+                           sandbox, settings, variant=variant)
     router = make_router(settings, None, all_strong)
     model, model_name = router.for_role("coder"), router.model_name("coder")
     if name == "single_shot":

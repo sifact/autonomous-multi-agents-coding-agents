@@ -260,3 +260,35 @@ def test_on_saved_reports_the_result_path_even_when_the_run_crashes(tmp_path):
     saved.clear()
     run(FakeSystem(ok, ok), tmp_path / "b", on_saved=saved.append)
     assert len(saved) == 1 and saved[0].exists()
+
+
+# --- graph variants in result files -----------------------------------------
+
+
+class VariantSystem(FakeSystem):
+    name = "graph"
+
+    def __init__(self, variant, *steps):
+        super().__init__(*steps)
+        self.variant = variant
+
+    def describe(self):
+        return {**super().describe(), "variant": self.variant}
+
+
+@pytest.mark.parametrize("variant,prefix", [
+    ("full", "graph-2"), ("no-planner", "graph-no-planner-2"),
+    ("no-architect", "graph-no-architect-2"), ("all-strong", "graph-all-strong-2"),
+])
+def test_result_file_name_and_variant_field(tmp_path, variant, prefix):
+    run(VariantSystem(variant, output({"solution.py": "GOOD"})), tmp_path, tasks=TASK_LIST[:1])
+    (path,) = tmp_path.glob("*.json")
+    assert path.name.startswith(prefix) and path.name.endswith("Z.json")
+    data = json.loads(path.read_text())
+    assert data["variant"] == variant and data["system"] == "graph"
+
+
+def test_systems_without_a_variant_record_full(tmp_path):
+    run(FakeSystem(output({"solution.py": "GOOD"})), tmp_path, tasks=TASK_LIST[:1])
+    (path,) = tmp_path.glob("fake-*.json")
+    assert json.loads(path.read_text())["variant"] == "full"

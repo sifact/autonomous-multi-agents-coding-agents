@@ -17,6 +17,7 @@ from coding_agent.cli_support.printer import StepPrinter
 from coding_agent.evaluation import aggregate, load_fast_subset, load_tasks, run_benchmark
 from coding_agent.evaluation.readme_block import ReadmeMarkerError, write_readme_block
 from coding_agent.evaluation.report import load_results, render_markdown
+from coding_agent.evaluation.results_io import variant_label
 from coding_agent.graph import build_graph, stream_task
 from coding_agent.llm import MissingApiKeyError, UsageTracker
 from coding_agent.sandbox import PathEscapeError, write_files
@@ -35,6 +36,13 @@ class SystemName(StrEnum):
     single_shot = "single_shot"
     single_agent = "single_agent"
     graph = "graph"
+
+
+class Variant(StrEnum):
+    full = "full"
+    no_planner = "no-planner"
+    no_architect = "no-architect"
+    all_strong = "all-strong"
 
 
 class Subset(StrEnum):
@@ -189,13 +197,27 @@ def eval_(
     )] = None,
     out_dir: Annotated[Path | None, typer.Option(help="Where to write the result JSON.")] = None,
     all_strong: Annotated[bool, typer.Option(
-        help="Graph only: strong model for every role (baselines already use the strong coder)."
+        help="Graph only: strong model for every role (baselines already use the strong coder). "
+        "Same as --variant all-strong."
     )] = False,
+    variant: Annotated[Variant, typer.Option(
+        help="Graph only: full, no-planner, no-architect (skip that role, no model call) or "
+        "all-strong (strong model for every role)."
+    )] = Variant.full,
     max_rpm: Annotated[int | None, typer.Option(
         min=1, help="Cap on model requests per minute."
     )] = None,
 ) -> None:
     """Run the benchmark for one system and print the headline metrics."""
+    chosen = variant.value
+    if system is SystemName.graph:
+        if all_strong and chosen not in ("full", "all-strong"):
+            raise _fail(f"--all-strong cannot be combined with --variant {chosen}.", EXIT_BAD_INPUT)
+        if all_strong:
+            chosen = "all-strong"
+        all_strong = chosen == "all-strong"
+    elif chosen != "full":
+        raise _fail(f"--variant {chosen} applies to graph only.", EXIT_BAD_INPUT)
     settings = _settings(max_rpm)
     show(deps.tracing_status_line(settings))
     try:
@@ -203,13 +225,15 @@ def eval_(
         sandbox = deps.make_sandbox(settings)
         root = deps.tasks_dir()
         tasks = load_fast_subset(root) if subset is Subset.fast else load_tasks(root)
-        eval_system = deps.build_system(system.value, settings, sandbox, all_strong)
+        eval_system = deps.build_system(
+            system.value, settings, sandbox, all_strong, chosen)
     except deps.SetupError as exc:
         raise _fail(str(exc), EXIT_SETUP) from exc
     except (OSError, ValueError) as exc:
         raise _fail(f"Could not load the benchmark tasks: {exc}", EXIT_SETUP) from exc
 
-    config = f"Running {system.value} on {len(tasks)} tasks ({subset.value}), x{repeats}"
+    name = variant_label(system.value, chosen)
+    config = f"Running {name} on {len(tasks)} tasks ({subset.value}), x{repeats}"
     show(config)
     if all_strong and system is not SystemName.graph:
         show(f"note: --all-strong has no effect on {system.value} (it already uses the strong "

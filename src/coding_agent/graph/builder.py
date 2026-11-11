@@ -20,6 +20,8 @@ from coding_agent.agents import (
     make_executor,
     make_planner,
     make_reviewer,
+    make_skipped_architect,
+    make_skipped_planner,
 )
 from coding_agent.config import Settings
 from coding_agent.graph.report import build_report
@@ -33,11 +35,20 @@ from coding_agent.sandbox import Sandbox
 RECURSION_MARGIN = 10
 
 
-def build_graph(router: ModelRouter, sandbox: Sandbox, settings: Settings) -> CompiledStateGraph:
+def build_graph(
+    router: ModelRouter, sandbox: Sandbox, settings: Settings, *,
+    skip_planner: bool = False, skip_architect: bool = False,
+) -> CompiledStateGraph:
     """Compile the multi-agent graph with its dependencies injected.
 
     Models are fetched once per role here; the coder node gets both the
     "coder" and "debugger" models and picks by the last verdict.
+
+    ``skip_planner`` / ``skip_architect`` are the ablation switches: the role's node is
+    replaced by a zero-cost pass-through (no model call, event ``skipped: True``), so the
+    graph keeps its shape, counters and step budget. A skipped planner supplies a
+    one-step plan and still counts replans; a skipped architect leaves the layout empty
+    ("the coder decides").
     """
 
     def route(state: AgentState) -> str:
@@ -53,15 +64,21 @@ def build_graph(router: ModelRouter, sandbox: Sandbox, settings: Settings) -> Co
     def model(role: str):
         return router.for_role(role), router.model_name(role)
 
-    planner, planner_name = model("planner")
-    architect, architect_name = model("architect")
     coder, coder_name = model("coder")
     debugger, debugger_name = model("debugger")
     reviewer, reviewer_name = model("reviewer")
 
     graph = StateGraph(AgentState)
-    graph.add_node("planner", make_planner(planner, name=planner_name))
-    graph.add_node("architect", make_architect(architect, name=architect_name))
+    if skip_planner:
+        graph.add_node("planner", make_skipped_planner())
+    else:
+        planner, planner_name = model("planner")
+        graph.add_node("planner", make_planner(planner, name=planner_name))
+    if skip_architect:
+        graph.add_node("architect", make_skipped_architect())
+    else:
+        architect, architect_name = model("architect")
+        graph.add_node("architect", make_architect(architect, name=architect_name))
     graph.add_node("coder", make_coder(
         coder, debugger, name=coder_name, debugger_name=debugger_name,
     ))

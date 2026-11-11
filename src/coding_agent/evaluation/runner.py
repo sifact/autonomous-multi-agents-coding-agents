@@ -113,9 +113,17 @@ def _crash_record(
     )
 
 
-def result_id(system_name: str, timestamp: datetime) -> str:
-    """Stem of the result file; also the Langfuse session id so traces and file line up."""
-    return f"{system_name}-{timestamp.strftime('%Y%m%dT%H%M%S%fZ')}"
+def result_id(system_name: str, timestamp: datetime, variant: str = "full") -> str:
+    """Stem of the result file; also the Langfuse session id so traces and file line up.
+
+    The full variant keeps ``<system>-<timestamp>``; an ablation is ``<system>-<variant>-<ts>``.
+    """
+    stem = system_name if variant == "full" else f"{system_name}-{variant}"
+    return f"{stem}-{timestamp.strftime('%Y%m%dT%H%M%S%fZ')}"
+
+
+def _variant(system: System) -> str:
+    return str(system.describe().get("variant") or "full")
 
 
 def _task_trace(
@@ -151,6 +159,7 @@ def save_results(
     info = system.describe()
     payload: dict[str, Any] = {
         "system": system.name,
+        "variant": _variant(system),
         "models": info.get("models", {}),
         "resolved_roles": info.get("resolved_roles", {}),
         "settings": info.get("settings", {}),
@@ -166,7 +175,7 @@ def save_results(
         "metrics": dataclasses.asdict(aggregate(records)) if records else None,
     }
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"{result_id(system.name, timestamp)}.json"
+    path = out_dir / f"{result_id(system.name, timestamp, _variant(system))}.json"
     path.write_text(json.dumps(payload, indent=2))
     return path
 
@@ -190,7 +199,7 @@ def run_benchmark(
     no-op without keys.
     """
     started = datetime.now(UTC)
-    session = result_id(system.name, started)
+    session = result_id(system.name, started, _variant(system))
     records: list[RunRecord] = []
     failures = 0
     last_exc: Exception | None = None

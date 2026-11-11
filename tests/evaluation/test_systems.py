@@ -180,6 +180,41 @@ def test_describe_lists_models_and_settings(settings):
     assert loop.describe()["models"] == {"model": "x"}
 
 
+def _variant_system(settings, variant, trackers, scripts):
+    def factory(tracker):
+        trackers.append(tracker)
+        return scripted_router(settings, tracker, **scripts())[0]
+
+    return GraphSystem(factory, ScriptedSandbox(res(0)), settings, variant=variant)
+
+
+def test_graph_system_default_variant_is_full_and_described(settings):
+    system = GraphSystem(lambda t: None, ForbiddenSandbox(), settings)
+    assert system.variant == "full" and system.name == "graph"
+    assert system.describe()["variant"] == "full"
+
+
+def test_graph_system_rejects_an_unknown_variant(settings):
+    with pytest.raises(ValueError, match="unknown graph variant"):
+        GraphSystem(lambda t: None, ForbiddenSandbox(), settings, variant="no-coder")
+
+
+def test_no_planner_variant_runs_without_a_planner_call(settings):
+    scripts = lambda: {"architect": [layout()], "coder": [code("print('ok')")],
+                       "reviewer": [verdict("pass")]}
+    system = _variant_system(settings, "no-planner", [], scripts)
+    out = system.solve(SUM_CSV)
+    assert out.attempts == 1 and out.files == {"main.py": "print('ok')\n"}
+    assert system.describe()["variant"] == "no-planner"
+
+
+def test_no_architect_variant_runs_without_an_architect_call(settings):
+    scripts = lambda: {"planner": [plan()], "coder": [code("print('ok')")],
+                       "reviewer": [verdict("pass")]}
+    out = _variant_system(settings, "no-architect", [], scripts).solve(SUM_CSV)
+    assert out.attempts == 1 and out.files == {"main.py": "print('ok')\n"}
+
+
 def test_system_output_defaults():
     from coding_agent.llm import Usage
     out = SystemOutput({}, 1, None, False, False, Usage(0, 0), None, 0.0)

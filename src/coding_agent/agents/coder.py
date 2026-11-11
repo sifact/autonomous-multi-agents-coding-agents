@@ -24,7 +24,13 @@ from coding_agent.agents.context import (
     task_text,
 )
 from coding_agent.agents.json_out import ParseError, parse_json
-from coding_agent.agents.prompts import CODER_SYSTEM, CODER_USER, DEBUGGER_SYSTEM, DEBUGGER_USER
+from coding_agent.agents.prompts import (
+    CODER_SYSTEM,
+    CODER_USER,
+    DEBUGGER_SYSTEM,
+    DEBUGGER_USER,
+    NO_LAYOUT_NOTE,
+)
 from coding_agent.graph import AgentState, apply_verdict_counters, bump_visit
 from coding_agent.llm import ChatModel
 
@@ -107,7 +113,8 @@ def make_coder(
         else:
             user = CODER_USER.format(
                 task=task_text(state["task"], state["fixtures"]), plan=format_plan(state["plan"]),
-                criteria=format_list(state["criteria"]), layout=format_list(state["layout"]),
+                criteria=format_list(state["criteria"]),
+                layout=format_list(state["layout"]) if state["layout"] else NO_LAYOUT_NOTE,
             )
             resp = model.invoke(CODER_SYSTEM, user)
         files, dropped = split_files(resp.text)
