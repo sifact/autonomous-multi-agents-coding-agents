@@ -1,10 +1,29 @@
 """Small text formatters shared by the CLI commands."""
 from __future__ import annotations
 
+import re
+
 from coding_agent.evaluation import Metrics, RunRecord
 
+# Whole escape sequences first (OSC up to BEL/ST, CSI incl. the 8-bit \x9b form, other
+# two-byte ESC sequences), then every remaining control character except newline and tab.
+_SEQUENCES = re.compile(
+    r"(?:\x1b\]|\x9d)[^\x07\x1b\x9c\n]*(?:\x07|\x1b\\|\x9c)?"
+    r"|(?:\x1b\[|\x9b)[0-?]*[ -/]*[@-~]?"
+    r"|\x1b[@-Z\\-_ -/]*"
+)
+_CONTROLS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
 TAIL_LINES = 6
 TAIL_CHARS = 600
+
+
+def sanitize(text: str) -> str:
+    """Make model/program text safe to print on a terminal.
+
+    Drops whole ANSI/OSC sequences and every C0/C1 control character except newline
+    and tab, so output can never retitle, clear or script the user's terminal.
+    """
+    return _CONTROLS.sub("", _SEQUENCES.sub("", text))
 
 
 def money(cost: float | None) -> str:

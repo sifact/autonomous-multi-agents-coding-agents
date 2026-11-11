@@ -77,9 +77,8 @@ class ModelRouter:
         self._limiter: RateLimiter | None = None
         if factory is None:
             self._limiter = RateLimiter(settings.max_rpm) if settings.max_rpm else None
-            factory = lambda model: GroqChatModel(
-                model, settings.groq_api_key, limiter=self._limiter
-            )
+            key = settings.groq_api_key.get_secret_value() if settings.groq_api_key else None
+            factory = lambda model: GroqChatModel(model, key, limiter=self._limiter)
         self._factory = factory
 
     def model_name(self, role: Role) -> str:

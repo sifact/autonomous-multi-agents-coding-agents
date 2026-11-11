@@ -104,7 +104,7 @@ The tasks are 17 easy, 19 medium and 10 hard. A 10-task fast subset (`benchmarks
 | Architecture diagrams (high-level and low-level) | Done: see [Design diagrams](#design-diagrams) |
 | Demo GIF of a self-repair | Planned |
 
-The test suite (398 tests) passes locally, including the tests that run against the real sandbox.
+The test suite (418 tests) passes locally, including the tests that run against the real sandbox.
 
 ## Design diagrams
 
@@ -144,7 +144,9 @@ uv run agent eval --system graph --subset fast
 uv run agent safety
 ```
 
-`agent run` and `agent eval` call Groq, so they need `GROQ_API_KEY`. `agent safety` and the test suite do not. Exit codes: 0 success, 1 the run failed, 2 bad input, 3 setup problem (no key, Docker not running, sandbox image not built). `agent eval` writes a result file to `benchmarks/results/`. `agent report` is a placeholder for now. See `agent --help` for all options.
+Useful options: `agent run --out DIR` (where the files go; default `./agent_out/<UTC time>/`, which is git-ignored), `--quiet` (only the final summary), `--verbose` (print the full code of every version), `--all-strong` (graph only: strong model for every role; the two baselines already use the strong coder, so it changes nothing for them), `--max-rpm N`. `agent eval` also takes `--repeats`, `--max-runs-per-min` and `--out-dir`.
+
+`agent run` and `agent eval` call Groq, so they need `GROQ_API_KEY`. `agent safety` and the test suite do not. Exit codes: 0 success, 1 the run failed, 2 bad input, 3 setup problem (no key, a key Groq rejects, Docker not running, sandbox image not built, or the output files could not be written), 130 interrupted with Ctrl-C. `agent eval` writes one JSON result file per run to `benchmarks/results/` (or `--out-dir`) and prints its path, also after a crash or Ctrl-C. `agent report` is a placeholder for now. See `agent --help` for all options.
 
 ## Tech stack
 

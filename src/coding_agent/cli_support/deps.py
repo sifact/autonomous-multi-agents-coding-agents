@@ -46,7 +46,7 @@ def tasks_dir() -> Path:
 def make_router(
     settings: Settings, tracker: UsageTracker | None, all_strong: bool = False
 ) -> ModelRouter:
-    if not settings.groq_api_key:
+    if not (settings.groq_api_key and settings.groq_api_key.get_secret_value()):
         raise SetupError(MISSING_KEY_MESSAGE)
     return ModelRouter(settings, tracker, all_strong=all_strong)
 

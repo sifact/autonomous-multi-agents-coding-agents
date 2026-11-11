@@ -2,7 +2,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from coding_agent.sandbox import Limits
@@ -16,7 +16,7 @@ def _default_workspace_root() -> Path:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    groq_api_key: str | None = None
+    groq_api_key: SecretStr | None = None  # secret: hidden from repr/str
     max_rpm: int | None = Field(default=None, ge=1)  # env MAX_RPM; per-key request cap
     model_cheap: str = "llama-3.1-8b-instant"
     model_strong: str = "llama-3.3-70b-versatile"

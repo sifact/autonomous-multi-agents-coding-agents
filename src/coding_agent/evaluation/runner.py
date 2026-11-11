@@ -142,13 +142,15 @@ def run_benchmark(
     tasks: list[Task], system: System, sandbox: Sandbox, repeats: int = 1, seed: int = 0,
     max_runs_per_min: int | None = None, out_dir: Path | None = None,
     on_record: Callable[[RunRecord], None] | None = None,
+    on_saved: Callable[[Path], None] | None = None,
 ) -> list[RunRecord]:
     """Run ``system`` over ``tasks`` x ``repeats``, grade with hidden tests, save, return records.
 
     ``max_runs_per_min`` is coarse pacing: run starts are spaced at least
     ``60 / max_runs_per_min`` seconds apart. The per-request limiter
     (``Settings.max_rpm``) lives in the Groq client; this only keeps a benchmark
-    of many quick tasks from bursting.
+    of many quick tasks from bursting. ``on_saved(path)`` is called with the result file's
+    path once it is written, including when the run crashes or is interrupted.
     """
     started = datetime.now(UTC)
     records: list[RunRecord] = []
@@ -178,8 +180,10 @@ def run_benchmark(
                     assert last_exc is not None
                     raise last_exc
     finally:
-        save_results(
+        saved = save_results(
             out_dir or DEFAULT_OUT_DIR, system, records, tasks,
             seed=seed, repeats=repeats, max_runs_per_min=max_runs_per_min, timestamp=started,
         )
+        if on_saved:
+            on_saved(saved)
     return records

@@ -11,15 +11,15 @@ from typing import Annotated
 import typer
 
 from coding_agent.cli_support import deps
-from coding_agent.cli_support.format import metrics_lines, money, record_line
+from coding_agent.cli_support.errors import AUTH_MESSAGE, is_auth_error
+from coding_agent.cli_support.format import metrics_lines, money, record_line, sanitize
 from coding_agent.cli_support.printer import StepPrinter
 from coding_agent.evaluation import aggregate, load_fast_subset, load_tasks, run_benchmark
-from coding_agent.evaluation.runner import DEFAULT_OUT_DIR
 from coding_agent.graph import build_graph, stream_task
 from coding_agent.llm import MissingApiKeyError, UsageTracker
 from coding_agent.sandbox import PathEscapeError, write_files
 
-EXIT_OK, EXIT_FAILED, EXIT_BAD_INPUT, EXIT_SETUP = 0, 1, 2, 3
+EXIT_OK, EXIT_FAILED, EXIT_BAD_INPUT, EXIT_SETUP, EXIT_INTERRUPTED = 0, 1, 2, 3, 130
 MAX_TASK_CHARS = 4000
 
 app = typer.Typer(
@@ -60,8 +60,33 @@ def main(
 
 
 def _fail(message: str, code: int) -> typer.Exit:
-    typer.echo(message, err=True)
+    typer.echo(sanitize(message), err=True)
     return typer.Exit(code)
+
+
+def show(text: str) -> None:
+    """Print text that may come from a model or a program, with terminal controls removed."""
+    typer.echo(sanitize(text))
+
+
+def _api_failure(exc: Exception) -> typer.Exit:
+    """Clean message + exit code for an error raised mid-run (never echoes the key)."""
+    if is_auth_error(exc) or isinstance(exc, MissingApiKeyError):
+        message = AUTH_MESSAGE if is_auth_error(exc) else deps.MISSING_KEY_MESSAGE
+        return _fail(message, EXIT_SETUP)
+    return _fail(sanitize(f"The run failed: {type(exc).__name__}: {exc}"), EXIT_FAILED)
+
+
+def _write_files(out_dir: Path, files: dict[str, str]) -> str | None:
+    """Write through the safe writer; the error text on failure, else None."""
+    if not files:
+        return None
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        write_files(out_dir, files)
+    except (OSError, PathEscapeError) as exc:
+        return f"{type(exc).__name__}: {exc}"
+    return None
 
 
 def _validated_task(task: str) -> str:
@@ -105,6 +130,7 @@ def run(
 
     printer = StepPrinter(typer.echo, verbose=verbose, quiet=quiet)
     final = None
+    attempts = 0  # code generations: first draft + every repair or replan rewrite
     start = time.monotonic()
     try:
         graph = build_graph(router, sandbox, settings)
@@ -112,33 +138,32 @@ def run(
             if node == "finalize":
                 final = update["final"]
             else:
+                attempts += node == "coder"
                 printer.handle(node, update)
-    except MissingApiKeyError as exc:
-        raise _fail(deps.MISSING_KEY_MESSAGE, EXIT_SETUP) from exc
+    except KeyboardInterrupt as exc:
+        raise _fail("Interrupted.", EXIT_INTERRUPTED) from exc
     except Exception as exc:
-        raise _fail(f"The run crashed: {type(exc).__name__}: {exc}", EXIT_FAILED) from exc
+        raise _api_failure(exc) from exc
     wall = time.monotonic() - start
     if final is None:
         raise _fail("The run ended without a final report.", EXIT_FAILED)
 
     out_dir = out or Path("agent_out") / datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    written = ""
+    write_error = _write_files(out_dir, final.files)
+    show("")
+    show("SUCCESS" if final.success else "FAILED")
+    show(f"  attempts: {attempts} (1 + {final.repairs} repair(s) in the last plan)")
+    show(f"  tokens:   {final.usage.tokens_in} in / {final.usage.tokens_out} out")
+    show(f"  cost:     {money(tracker.total_cost)}")
+    show(f"  wall time: {wall:.1f}s")
+    show(f"  {final.explanation}")
+    if write_error:
+        show(f"Files NOT written to {out_dir}: {write_error}")
+        for path, content in sorted(final.files.items()):
+            show(f"--- {path} ---\n{content}")
+        raise typer.Exit(EXIT_SETUP)
     if final.files:
-        try:
-            out_dir.mkdir(parents=True, exist_ok=True)
-            write_files(out_dir, final.files)
-            written = f"Files written to: {out_dir}"
-        except PathEscapeError as exc:
-            written = f"Files NOT written: {exc}"
-    typer.echo("")
-    typer.echo("SUCCESS" if final.success else "FAILED")
-    typer.echo(f"  repairs:  {final.repairs}")
-    typer.echo(f"  tokens:   {final.usage.tokens_in} in / {final.usage.tokens_out} out")
-    typer.echo(f"  cost:     {money(tracker.total_cost)}")
-    typer.echo(f"  wall time: {wall:.1f}s")
-    typer.echo(f"  {final.explanation}")
-    if written:
-        typer.echo(written)
+        show(f"Files written to: {out_dir}")
     raise typer.Exit(EXIT_OK if final.success else EXIT_FAILED)
 
 
@@ -153,7 +178,9 @@ def eval_(
         min=1, help="Pace run starts."
     )] = None,
     out_dir: Annotated[Path | None, typer.Option(help="Where to write the result JSON.")] = None,
-    all_strong: Annotated[bool, typer.Option(help="Use the strong model for every role.")] = False,
+    all_strong: Annotated[bool, typer.Option(
+        help="Graph only: strong model for every role (baselines already use the strong coder)."
+    )] = False,
     max_rpm: Annotated[int | None, typer.Option(
         min=1, help="Cap on model requests per minute."
     )] = None,
@@ -171,19 +198,31 @@ def eval_(
     except (OSError, ValueError) as exc:
         raise _fail(f"Could not load the benchmark tasks: {exc}", EXIT_SETUP) from exc
 
-    typer.echo(f"Running {system.value} on {len(tasks)} tasks ({subset.value}), x{repeats}")
+    config = f"Running {system.value} on {len(tasks)} tasks ({subset.value}), x{repeats}"
+    show(config)
+    if all_strong and system is not SystemName.graph:
+        show(f"note: --all-strong has no effect on {system.value} (it already uses the strong "
+             "coder model)")
+    saved: list[Path] = []
     try:
         records = run_benchmark(
             tasks, eval_system, sandbox, repeats=repeats, max_runs_per_min=max_runs_per_min,
-            out_dir=out_dir, on_record=lambda r: typer.echo(record_line(r)),
+            out_dir=out_dir, on_record=lambda r: show(record_line(r)), on_saved=saved.append,
         )
+    except KeyboardInterrupt as exc:
+        _report_saved(saved, partial=True)
+        raise _fail("Interrupted.", EXIT_INTERRUPTED) from exc
     except Exception as exc:
-        raise _fail(f"The benchmark stopped: {type(exc).__name__}: {exc}", EXIT_FAILED) from exc
-    typer.echo("")
-    typer.echo("\n".join(metrics_lines(aggregate(records))))
-    saved = sorted((out_dir or DEFAULT_OUT_DIR).glob(f"{eval_system.name}-*.json"))
+        _report_saved(saved, partial=True)
+        raise _api_failure(exc) from exc
+    show("")
+    show("\n".join(metrics_lines(aggregate(records))))
+    _report_saved(saved, partial=False)
+
+
+def _report_saved(saved: list[Path], *, partial: bool) -> None:
     if saved:
-        typer.echo(f"Results written to: {saved[-1]}")
+        show(f"{'Partial results saved to' if partial else 'Results written to'}: {saved[-1]}")
 
 
 @app.command()

@@ -248,3 +248,15 @@ def test_first_try_pass_from_first_execution_real_grading(tmp_path):
     assert rec.first_try_pass is False and rec.final_pass is True
     assert rec.had_runtime_error and rec.fixed_within_3 and rec.attempts == 2
     assert rec.cost_usd is None and rec.error is None
+
+
+def test_on_saved_reports_the_result_path_even_when_the_run_crashes(tmp_path):
+    saved = []
+    sysm = FakeSystem(OSError("x"), OSError("x"), OSError("x"))
+    with pytest.raises(OSError):
+        run(sysm, tmp_path, tasks=TASK_LIST * 3, on_saved=saved.append)
+    assert saved == [next(tmp_path.glob("fake-*.json"))]
+    ok = output({"solution.py": "GOOD"})
+    saved.clear()
+    run(FakeSystem(ok, ok), tmp_path / "b", on_saved=saved.append)
+    assert len(saved) == 1 and saved[0].exists()

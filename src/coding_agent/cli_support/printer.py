@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from coding_agent.cli_support.format import tail
+from coding_agent.cli_support.format import sanitize, tail
 
 
 class StepPrinter:
@@ -17,7 +17,7 @@ class StepPrinter:
 
     def _say(self, text: str = "") -> None:
         if not self._quiet:
-            self._echo(text)
+            self._echo(sanitize(text))
 
     def handle(self, node: str, update: dict[str, Any]) -> None:
         getattr(self, f"_{node}", lambda _u: None)(update)
@@ -45,6 +45,8 @@ class StepPrinter:
         if self._verbose:
             for path, content in sorted(u["files"].items()):
                 self._say(f"--- {path} ---\n{content}")
+        for path in u["events"][-1].get("dropped_paths", []):
+            self._say(f"  dropped unusable path: {path}")
         if u.get("repairs"):
             self._say(f"  repairs so far: {u['repairs']}")
 
@@ -52,8 +54,12 @@ class StepPrinter:
         v = u["code_versions"][-1]
         r = u["last_exec"]
         self._say(f"== Run (version {v['version']}) ==")
-        self._say(f"  command: {' '.join(v['command'])}")
-        self._say(f"  exit code {r.exit_code} in {r.duration_s:.1f}s ({v['summary']})")
+        if v["command"]:
+            self._say(f"  command: {' '.join(v['command'])}")
+            self._say(f"  exit code {r.exit_code} in {r.duration_s:.1f}s ({v['summary']})")
+        else:  # failed before running: nothing to execute (no files, bad paths)
+            self._say(f"  not run: {r.stderr.strip() or v['summary']}")
+            return
         for label, text in (("stdout", r.stdout), ("stderr", r.stderr)):
             if text.strip():
                 self._say(f"  {label} tail:")

@@ -23,3 +23,9 @@ def test_env_override(monkeypatch):
     get_settings.cache_clear()
     assert get_settings().model_strong == "x"
     get_settings.cache_clear()
+
+
+def test_api_key_is_secret_in_repr_and_str():
+    s = Settings(groq_api_key="gsk_SENTINEL_xyz", _env_file=None)
+    assert "gsk_SENTINEL_xyz" not in repr(s) and "gsk_SENTINEL_xyz" not in str(s)
+    assert s.groq_api_key.get_secret_value() == "gsk_SENTINEL_xyz"
