@@ -1,0 +1,3 @@
+category = "bug_fix"
+difficulty = "easy"
+bug_type = "off_by_one_slice"
