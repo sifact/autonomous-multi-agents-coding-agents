@@ -59,7 +59,7 @@ Model output is also treated as untrusted when it flows back into prompts. Progr
 
 The most important part of the project is the benchmark, not the demo.
 
-**The benchmark** is 46 tasks with hidden tests, the agent never sees them. 36 are written and reviewed so far:
+**The benchmark** is 46 tasks with hidden tests, the agent never sees them. All 46 are written:
 
 | Category | Written | Planned |
 |---|---|---|
@@ -68,9 +68,9 @@ The most important part of the project is the benchmark, not the demo.
 | HTML parsing from **local fixtures** (no real websites) | 4 | 4 |
 | Command-line apps (todo, key-value store, calculator, ...) | 8 | 8 |
 | Charts (checked on the figure's actual content) | 6 | 6 |
-| Bug-fix (a bug is injected, the agent must fix it) | 0 | 10 |
+| Bug-fix (a bug is injected, the agent must fix it) | 10 | 10 |
 
-The written tasks are 14 easy, 15 medium and 7 hard.
+The tasks are 17 easy, 19 medium and 10 hard. A 10-task fast subset (`benchmarks/fast_subset.txt`) covers every category for quick CI runs.
 
 **How the tasks are kept honest.** Every task has a prompt that pins the exact interface, a reference solution, and hidden tests. Each task was then reviewed by someone other than its author, who recomputed expected values by an independent method, wrote alternative correct solutions to make sure they pass, and wrote wrong-but-plausible solutions to make sure they fail. A validator checks that the reference passes and that empty or starter code fails. The grader refuses agent-written files that could tamper with the test run.
 
@@ -95,7 +95,7 @@ The written tasks are 14 easy, 15 medium and 7 hard.
 | Safety suite (7 attacks) + static scan | Done, tested |
 | LangGraph agents and routing (planner, architect, coder, executor, reviewer) | Done, tested with scripted models and the real sandbox |
 | Baselines and benchmark runner | Done, tested |
-| Benchmark tasks | 36 of 46 written |
+| Benchmark tasks | 46 of 46 written |
 | Command line (`agent run "..."`) | Next |
 | Langfuse tracing | Planned |
 | Measured results and ablation table | Planned (needs a Groq key) |
@@ -103,7 +103,7 @@ The written tasks are 14 easy, 15 medium and 7 hard.
 | Web UI that streams the agent's steps | Planned |
 | Architecture diagram and a demo GIF of a self-repair | Planned |
 
-The test suite (365 tests) passes locally, including the tests that run against the real sandbox.
+The test suite (380 tests) passes locally, including the tests that run against the real sandbox.
 
 ## Run it
 
