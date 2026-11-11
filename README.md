@@ -4,7 +4,7 @@ Give it a coding task in plain English. A team of agents plans it, designs the f
 
 Built with [LangGraph](https://langchain-ai.github.io/langgraph/) and Groq-hosted models. The point of the project is not only that it works, but that the claim "multiple agents help" is **measured**: a hidden-test benchmark compares the full agent graph against a single-shot LLM and a single looping agent.
 
-> **Status: work in progress.** The sandbox, the agent graph, the evaluation harness and the full 46-task benchmark are built and tested. The command-line tool, tracing, the web UI and the measured results are next. See [Status](#status) for exactly what exists today. No benchmark numbers are published yet, because they have not been run yet.
+> **Status: work in progress.** The sandbox, the agent graph, the evaluation harness and the full 46-task benchmark are built and tested. The command-line tool is built too; tracing, the web UI and the measured results are next. See [Status](#status) for exactly what exists today. No benchmark numbers are published yet, because they have not been run yet.
 
 ---
 
@@ -96,7 +96,7 @@ The tasks are 17 easy, 19 medium and 10 hard. A 10-task fast subset (`benchmarks
 | LangGraph agents and routing (planner, architect, coder, executor, reviewer) | Done, tested with scripted models and the real sandbox |
 | Baselines and benchmark runner | Done, tested |
 | Benchmark tasks | 46 of 46 written |
-| Command line (`agent run "..."`) | Next |
+| Command line (`agent run`, `agent eval`, `agent safety`) | Done, tested with scripted models |
 | Langfuse tracing | Planned |
 | Measured results and ablation table | Planned (needs a Groq key) |
 | CI with an evaluation badge | Planned |
@@ -104,7 +104,7 @@ The tasks are 17 easy, 19 medium and 10 hard. A 10-task fast subset (`benchmarks
 | Architecture diagrams (high-level and low-level) | Done: see [Design diagrams](#design-diagrams) |
 | Demo GIF of a self-repair | Planned |
 
-The test suite (380 tests) passes locally, including the tests that run against the real sandbox.
+The test suite (398 tests) passes locally, including the tests that run against the real sandbox.
 
 ## Design diagrams
 
@@ -131,6 +131,21 @@ uv run pytest
 
 To use real models, copy `.env.example` to `.env` and set `GROQ_API_KEY`. The key stays on your machine and is never committed. Model names for the cheap role (planner, architect, reviewer) and the strong role (coder, repairs) are configurable in `src/coding_agent/config.py`.
 
+### Use it
+
+```bash
+# give the agent a task; it prints each step and writes the files to ./agent_out/<time>/
+uv run agent run "Write a script that prints the first 10 primes"
+
+# benchmark a system on the 10-task fast subset (or --subset full); also: single_shot, single_agent
+uv run agent eval --system graph --subset fast
+
+# check that the sandbox contains the 7 attacks (no API key needed)
+uv run agent safety
+```
+
+`agent run` and `agent eval` call Groq, so they need `GROQ_API_KEY`. `agent safety` and the test suite do not. Exit codes: 0 success, 1 the run failed, 2 bad input, 3 setup problem (no key, Docker not running, sandbox image not built). `agent eval` writes a result file to `benchmarks/results/`. `agent report` is a placeholder for now. See `agent --help` for all options.
+
 ## Tech stack
 
 Python · LangGraph · Groq (via `langchain-groq`) · Docker · pydantic · pytest · uv · ruff. Planned: Langfuse, FastAPI, GitHub Actions.
@@ -144,6 +159,7 @@ src/coding_agent/
   sandbox/      Docker sandbox, limits, workspace, static scan
   llm/          Groq client with rate-limit handling, role routing, cost tracking
   evaluation/   tasks, grader, metrics, baselines, runner, safety suite
+  cli.py, cli_support/   command line: parsing, wiring, step printing
 benchmarks/tasks/   the benchmark: prompt, fixtures, hidden tests, reference per task
 docker/             sandbox image definition
 tests/              unit and end-to-end tests
