@@ -99,7 +99,7 @@ def test_status_line(keyed, unkeyed):
     assert tracing_status_line(unkeyed) == (
         "Langfuse tracing: off (set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY to enable)")
     on = tracing_status_line(keyed)
-    assert on == "Langfuse tracing: on (https://cloud.langfuse.com)"
+    assert on == "Langfuse tracing: on (http://127.0.0.1:9)"
     assert SECRET not in on and PUBLIC not in on
 
 
@@ -108,3 +108,44 @@ def test_status_line_shows_the_host(host):
     s = Settings(langfuse_public_key=PUBLIC, langfuse_secret_key=SECRET, langfuse_host=host,
                  _env_file=None)
     assert tracing_status_line(s) == "Langfuse tracing: on (http://localhost:3000)"
+
+
+def test_the_network_guard_really_blocks_external_hosts():
+    import socket
+
+    with pytest.raises(AssertionError, match="non-loopback"):
+        socket.getaddrinfo("cloud.langfuse.com", 443)
+    with pytest.raises(AssertionError, match="non-loopback"):
+        socket.create_connection(("203.0.113.7", 80), timeout=0.1)
+
+
+def test_default_settings_host_is_cloud_but_keyed_fixture_is_loopback(keyed):
+    assert keyed.langfuse_host.startswith("http://127.0.0.1")
+
+
+def test_client_kwargs_bound_the_exit_delay(keyed):
+    kw = langfuse_setup.client_kwargs(keyed)
+    assert kw["timeout"] == 2 and kw["flush_interval"] <= 1 and kw["flush_at"] <= 64
+    longer = langfuse_setup.client_kwargs(keyed.model_copy(update={"langfuse_timeout": 7}))
+    assert longer["timeout"] == 7
+    assert "mask_otel_spans" in kw and "tracer_provider" in kw
+
+
+def test_timeout_env_name(monkeypatch):
+    monkeypatch.setenv("LANGFUSE_TIMEOUT", "9")
+    assert Settings(_env_file=None).langfuse_timeout == 9
+
+
+def test_failed_client_creation_warns_once_per_key(keyed, monkeypatch, caplog):
+    calls = []
+
+    def boom(settings):
+        calls.append(1)
+        raise RuntimeError("nope")
+
+    monkeypatch.setattr(langfuse_setup, "_new_client", boom)
+    langfuse_setup.reset()
+    for _ in range(3):
+        assert get_callbacks(keyed) == []
+    assert len(calls) == 1
+    assert caplog.text.count("Langfuse tracing disabled") == 1

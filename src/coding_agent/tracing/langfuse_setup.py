@@ -11,12 +11,15 @@ import threading
 from typing import Any
 
 from coding_agent.config import Settings
-from coding_agent.tracing.masking import make_mask
+from coding_agent.tracing.masking import Scrubber, make_mask, make_scrubber
 
 log = logging.getLogger(__name__)
 
 _clients: dict[tuple[str, str], Any] = {}  # one client (= one export thread) per key and host
+_failed: set[tuple[str, str]] = set()  # keys whose client could not be built: warn once
 _lock = threading.Lock()
+FLUSH_AT = 64  # spans per export batch (the SDK default is 512)
+FLUSH_INTERVAL_S = 1.0  # seconds between background exports (the SDK default is 5)
 
 
 def _secret(value: Any) -> str:
@@ -28,15 +31,39 @@ def tracing_enabled(settings: Settings) -> bool:
     return bool(_secret(settings.langfuse_public_key) and _secret(settings.langfuse_secret_key))
 
 
+def _secrets(settings: Settings) -> list[str]:
+    return [_secret(settings.langfuse_public_key), _secret(settings.langfuse_secret_key),
+            _secret(settings.groq_api_key)]
+
+
+def scrubber_for(settings: Settings) -> Scrubber:
+    """The string scrubber for these settings (configured keys plus key-shaped tokens)."""
+    return make_scrubber(_secrets(settings))
+
+
 def client_kwargs(settings: Settings) -> dict[str, Any]:
-    """Arguments for ``Langfuse(...)``: keys, host and the secret-scrubbing mask."""
+    """Arguments for ``Langfuse(...)``: keys, host, masking and bounded export timing.
+
+    Our own TracerProvider (not the global one) carries the scrubbing processor, registered
+    before Langfuse's, and the seed-proof id generator.
+    """
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+
     from coding_agent.tracing.ids import SecureIdGenerator
+    from coding_agent.tracing.scrub_spans import SpanScrubProcessor, make_mask_otel_spans
 
     public, secret = _secret(settings.langfuse_public_key), _secret(settings.langfuse_secret_key)
+    scrub = scrubber_for(settings)
+    provider = TracerProvider(resource=Resource.create({}), id_generator=SecureIdGenerator())
+    provider.add_span_processor(SpanScrubProcessor(scrub))
     return {
         "public_key": public, "secret_key": secret, "base_url": settings.langfuse_host,
-        "mask": make_mask([public, secret, _secret(settings.groq_api_key)]),
-        "id_generator": SecureIdGenerator(),
+        "mask": make_mask(_secrets(settings)),
+        "mask_otel_spans": make_mask_otel_spans(scrub),
+        "tracer_provider": provider,
+        "timeout": settings.langfuse_timeout,
+        "flush_at": FLUSH_AT, "flush_interval": FLUSH_INTERVAL_S,
     }
 
 
@@ -52,11 +79,15 @@ def get_client(settings: Settings) -> Any | None:
         return None
     key = (_secret(settings.langfuse_public_key), settings.langfuse_host)
     with _lock:
+        if key in _failed:
+            return None
         if key not in _clients:
             try:
                 _clients[key] = _new_client(settings)
             except Exception as exc:  # noqa: BLE001 - tracing must never break a run
-                log.warning("Langfuse tracing disabled: %s: %s", type(exc).__name__, exc)
+                _failed.add(key)
+                log.warning("Langfuse tracing disabled: %s: %s", type(exc).__name__,
+                            scrubber_for(settings)(str(exc)))
                 return None
         return _clients[key]
 
@@ -71,7 +102,8 @@ def get_callbacks(settings: Settings) -> list[Any]:
 
         return [CallbackHandler(public_key=_secret(settings.langfuse_public_key))]
     except Exception as exc:  # noqa: BLE001
-        log.warning("Langfuse tracing disabled: %s: %s", type(exc).__name__, exc)
+        log.warning("Langfuse tracing disabled: %s: %s", type(exc).__name__,
+                    scrubber_for(settings)(str(exc)))
         return []
 
 
@@ -97,6 +129,7 @@ def reset() -> None:
     with _lock:
         clients = list(_clients.values())
         _clients.clear()
+        _failed.clear()
     for client in clients:
         try:
             client.shutdown()

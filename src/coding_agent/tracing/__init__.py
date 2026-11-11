@@ -6,7 +6,7 @@ from coding_agent.tracing.langfuse_setup import (
     tracing_enabled,
     tracing_status_line,
 )
-from coding_agent.tracing.masking import REDACTED, make_mask
+from coding_agent.tracing.masking import REDACTED, make_mask, make_scrubber
 from coding_agent.tracing.metadata import trace_metadata
 from coding_agent.tracing.run import TraceRun, summarize_report, trace_run
 
@@ -17,6 +17,7 @@ __all__ = [
     "get_callbacks",
     "langfuse_setup",
     "make_mask",
+    "make_scrubber",
     "summarize_report",
     "trace_metadata",
     "trace_run",

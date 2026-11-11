@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     langfuse_public_key: SecretStr | None = None
     langfuse_secret_key: SecretStr | None = None
     langfuse_host: str = "https://cloud.langfuse.com"
+    # Seconds a Langfuse export request may take; bounds the delay at exit if the host is down.
+    langfuse_timeout: int = Field(default=2, ge=1)  # env LANGFUSE_TIMEOUT
     model_cheap: str = "llama-3.1-8b-instant"
     model_strong: str = "llama-3.3-70b-versatile"
     sandbox_image: str = "coding-agent-sandbox:latest"

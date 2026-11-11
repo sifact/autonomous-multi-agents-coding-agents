@@ -137,6 +137,8 @@ def _record_in_trace(trace: TraceRun, record: RunRecord) -> None:
         "matched_budget_pass": record.matched_budget_pass, "attempts": record.attempts,
         "tokens_in": record.tokens_in, "tokens_out": record.tokens_out, "error": record.error,
     })
+    if record.error:  # an infrastructure failure says nothing about quality: no scores
+        return
     for name in ("final_pass", "first_try_pass", "matched_budget_pass"):
         trace.score(name, getattr(record, name))
 

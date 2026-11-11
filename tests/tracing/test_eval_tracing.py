@@ -88,3 +88,16 @@ def test_baseline_system_runs_inside_the_trace(keyed, memory, tmp_path):
                            tracing=keyed)
     assert rec.error is None
     assert [r.name for r in roots(memory)] == ["coding-agent/single_shot"]
+
+
+def test_crashed_runs_get_no_quality_scores(keyed, memory, tmp_path):
+    run_benchmark(TASK_LIST[:1], FakeSystem(RuntimeError("down")), MarkerGrader(),
+                  out_dir=tmp_path, tracing=keyed)
+    assert memory.scores == []
+
+
+def test_graded_runs_do_get_scores(keyed, memory, tmp_path):
+    run_benchmark(TASK_LIST[:1], FakeSystem(output(OK_FILES)), MarkerGrader(),
+                  out_dir=tmp_path, tracing=keyed)
+    assert {s["name"] for s in memory.scores} == {
+        "final_pass", "first_try_pass", "matched_budget_pass"}

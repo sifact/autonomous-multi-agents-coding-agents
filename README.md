@@ -104,7 +104,7 @@ The tasks are 17 easy, 19 medium and 10 hard. A 10-task fast subset (`benchmarks
 | Architecture diagrams (high-level and low-level) | Done: see [Design diagrams](#design-diagrams) |
 | Demo GIF of a self-repair | Planned |
 
-The test suite (467 tests) passes locally, including the tests that run against the real sandbox.
+The test suite (486 tests) passes locally, including the tests that run against the real sandbox.
 
 ## Design diagrams
 
@@ -160,7 +160,11 @@ LANGFUSE_HOST=https://cloud.langfuse.com   # or https://us.cloud.langfuse.com, o
 
 `agent run` and `agent eval` print `Langfuse tracing: on (<host>)` or `off (...)` at the start and send queued traces before they exit, also on Ctrl-C. With the keys unset nothing is imported or sent. A tracing problem (bad keys, no network) logs one warning and never fails a run.
 
-What a trace shows: one trace per run named `coding-agent/<system>`, with the task as its input and a short summary (success, repairs, explanation, token counts, file names) as its output. Under it, one span per graph step (planner, architect, coder, executor, reviewer, finalize), each with the update it returned (the plan, the code version with its exit code and output, the reviewer's verdict), and every Groq call as a generation with the model name and token usage. `agent eval` creates one trace per task run, groups them into a session named after the result file, tags them with the system, task id and category, and adds `final_pass`, `first_try_pass` and `matched_budget_pass` as scores after grading. Keys and key-shaped strings (`gsk_...`, `sk-...`, `Authorization` headers) are masked before anything is sent. Task text and generated code are sent, so use a Langfuse project you trust.
+What a trace shows: one trace per run named `coding-agent/<system>`, with the task as its input and a short summary (success, repairs, explanation, token counts, file names) as its output. Under it, one span per graph step (planner, architect, coder, executor, reviewer, finalize), each with the update it returned (the plan, the code version with its exit code and output, the reviewer's verdict), and every Groq call as a generation with the model name and token usage. `agent eval` creates one trace per task run, groups them into a session named after the result file, tags them with the system, task id and category, and adds `final_pass`, `first_try_pass` and `matched_budget_pass` as scores after grading. Before anything is sent, keys and key-shaped strings (`gsk_...`, `sk-...`, Langfuse `pk-lf-...`/`sk-lf-...`, `Authorization` and `Bearer` text, your configured keys) are removed from observation inputs, outputs and metadata, from span attributes (including error status messages), and from span names, status descriptions and exception events (message and stack trace). If a scrub step fails, the field is replaced, never sent raw. Task text and generated code are still sent, so use a Langfuse project you trust.
+
+Tracing is verified against an in-memory exporter, not against a real Langfuse server; you need your own Langfuse keys to see traces in the UI.
+
+`LANGFUSE_TIMEOUT` (seconds, default 2) bounds how long each export request may take, so an unreachable host delays exit by only a few seconds.
 
 ## Tech stack
 

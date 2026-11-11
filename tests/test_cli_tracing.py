@@ -11,6 +11,7 @@ from coding_agent.tracing import TraceRun, langfuse_setup
 from tests.evaluation.helpers import TASKS
 from tests.test_cli import GoodSandbox, ScriptedSystem, _fake_stream
 
+pytestmark = pytest.mark.usefixtures("no_external_network")
 runner = CliRunner()
 PUBLIC, SECRET = "pk-lf-CLIPUBLIC0000", "sk-lf-CLISECRET0000"
 OFF = "Langfuse tracing: off (set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY to enable)"

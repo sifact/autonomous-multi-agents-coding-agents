@@ -14,6 +14,7 @@ from typing import Any
 
 from coding_agent.config import Settings
 from coding_agent.tracing import langfuse_setup
+from coding_agent.tracing.masking import Scrubber
 from coding_agent.tracing.metadata import trace_metadata
 
 log = logging.getLogger(__name__)
@@ -34,8 +35,9 @@ class TraceRun:
 
     def __init__(
         self, *, client: Any = None, root: Any = None, callbacks: list[Any] | None = None,
-        metadata: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None, scrub: Scrubber | None = None,
     ) -> None:
+        self._scrub = scrub or (lambda text: text)
         self._client, self._root = client, root
         self.callbacks = callbacks or []
         self.metadata = metadata or {}
@@ -68,7 +70,7 @@ class TraceRun:
         self._safely(send)
 
     def record_error(self, exc: BaseException) -> None:
-        message = f"{type(exc).__name__}: {exc}"[:MAX_STATUS_CHARS]
+        message = self._scrub(f"{type(exc).__name__}: {exc}")[:MAX_STATUS_CHARS]
         self._safely(lambda: self._root.update(level="ERROR", status_message=message))
 
     def _safely(self, fn: Any) -> None:
@@ -97,8 +99,11 @@ def _open(
         client.start_as_current_observation(name=name, as_type="agent", input=input_text))
     stack.enter_context(propagate_attributes(
         trace_name=name, session_id=session_id, tags=metadata["langfuse_tags"]))
-    run = TraceRun(client=client, root=root, callbacks=callbacks, metadata=metadata)
-    # Ambient config: code that calls a model without an explicit config (the baselines'
+    run = TraceRun(client=client, root=root, callbacks=callbacks, metadata=metadata,
+                   scrub=langfuse_setup.scrubber_for(settings))
+    # Ambient config (guarded by tests/tracing/test_propagation.py: ``var_child_runnable_config``
+    # is a langchain_core module variable, not a documented API, hence the pinned version):
+    # code that calls a model without an explicit config (the baselines'
     # ChatGroq call) still reports to this handler through LangChain's context variable.
     token = var_child_runnable_config.set(run.config)
     stack.callback(var_child_runnable_config.reset, token)

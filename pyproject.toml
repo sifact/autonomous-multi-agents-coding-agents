@@ -7,12 +7,13 @@ requires-python = ">=3.12"
 dependencies = [
   "langgraph",
   "langchain-groq",
+  "langchain-core~=1.7.5",  # tracing reads its run-config contextvar (see tracing/run.py)
   "pydantic",
   "pydantic-settings",
   "typer",
   "fastapi",
   "uvicorn",
-  "langfuse",
+  "langfuse~=5.1.0",  # handler/masking APIs differ across majors
 ]
 
 [dependency-groups]

@@ -1,9 +1,9 @@
 # masking.py
 
-Builds the function that redacts secrets from everything sent to Langfuse.
+Builds the string scrubber and the data mask that redact secrets from everything sent to Langfuse.
 
-- `make_mask(secrets)` returns the callable passed as `Langfuse(mask=...)`; it runs on every input, output and metadata value.
-- Strings lose Groq keys (`gsk_...`), `sk-...` keys including Langfuse secret keys, `pk-lf-...` public keys, `Authorization:` header lines and bare `Bearer` tokens.
-- The exact configured key values are also removed, so an unusual key shape cannot slip through.
-- Dicts, lists and tuples are walked recursively and values under keys such as `authorization`, `api_key`, `token` or `password` are replaced outright.
-- The input is never mutated and ordinary text or code (for example `task-management-system`) is left untouched.
+- `make_scrubber(secrets)` returns `scrub(text)`, which removes `gsk_`, `sk-`, `pk-lf-` tokens (even glued to word characters), `Authorization:` lines, `Bearer` tokens and the exact configured keys.
+- A key broken over several lines is caught by re-checking the text with line breaks removed; if one shows up, the whole string is replaced.
+- `make_mask(secrets)` walks data for the SDK's `mask=` hook: dict keys and values, lists, tuples, sets, bytes, dataclasses, pydantic models, and any other object via `str()`.
+- `SecretStr` values become `<secret>`, values under keys such as `api_key` or `token` are replaced, and cycles or very deep data are cut off.
+- It never mutates its input and handles a 5 MB string in well under half a second.
