@@ -97,14 +97,14 @@ The tasks are 17 easy, 19 medium and 10 hard. A 10-task fast subset (`benchmarks
 | Baselines and benchmark runner | Done, tested |
 | Benchmark tasks | 46 of 46 written |
 | Command line (`agent run`, `agent eval`, `agent safety`) | Done, tested with scripted models |
-| Langfuse tracing | Planned |
+| Langfuse tracing | Done (code): verified against a recording handler; needs your own Langfuse keys to see traces in the UI |
 | Measured results and ablation table | Planned (needs a Groq key) |
 | CI with an evaluation badge | Planned |
 | Web UI that streams the agent's steps | Planned |
 | Architecture diagrams (high-level and low-level) | Done: see [Design diagrams](#design-diagrams) |
 | Demo GIF of a self-repair | Planned |
 
-The test suite (418 tests) passes locally, including the tests that run against the real sandbox.
+The test suite (467 tests) passes locally, including the tests that run against the real sandbox.
 
 ## Design diagrams
 
@@ -148,9 +148,23 @@ Useful options: `agent run --out DIR` (where the files go; default `./agent_out/
 
 `agent run` and `agent eval` call Groq, so they need `GROQ_API_KEY`. `agent safety` and the test suite do not. Exit codes: 0 success, 1 the run failed, 2 bad input, 3 setup problem (no key, a key Groq rejects, Docker not running, sandbox image not built, or the output files could not be written), 130 interrupted with Ctrl-C. `agent eval` writes one JSON result file per run to `benchmarks/results/` (or `--out-dir`) and prints its path, also after a crash or Ctrl-C. `agent report` is a placeholder for now. See `agent --help` for all options.
 
+## Tracing
+
+Tracing is optional and off by default. To see every run as a trace in [Langfuse](https://langfuse.com), create a free project at <https://cloud.langfuse.com> (or self-host), copy its API keys from Settings, and put them in `.env`:
+
+```
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_HOST=https://cloud.langfuse.com   # or https://us.cloud.langfuse.com, or your own server
+```
+
+`agent run` and `agent eval` print `Langfuse tracing: on (<host>)` or `off (...)` at the start and send queued traces before they exit, also on Ctrl-C. With the keys unset nothing is imported or sent. A tracing problem (bad keys, no network) logs one warning and never fails a run.
+
+What a trace shows: one trace per run named `coding-agent/<system>`, with the task as its input and a short summary (success, repairs, explanation, token counts, file names) as its output. Under it, one span per graph step (planner, architect, coder, executor, reviewer, finalize), each with the update it returned (the plan, the code version with its exit code and output, the reviewer's verdict), and every Groq call as a generation with the model name and token usage. `agent eval` creates one trace per task run, groups them into a session named after the result file, tags them with the system, task id and category, and adds `final_pass`, `first_try_pass` and `matched_budget_pass` as scores after grading. Keys and key-shaped strings (`gsk_...`, `sk-...`, `Authorization` headers) are masked before anything is sent. Task text and generated code are sent, so use a Langfuse project you trust.
+
 ## Tech stack
 
-Python · LangGraph · Groq (via `langchain-groq`) · Docker · pydantic · pytest · uv · ruff. Planned: Langfuse, FastAPI, GitHub Actions.
+Python · LangGraph · Groq (via `langchain-groq`) · Docker · pydantic · pytest · uv · ruff. Langfuse (optional tracing). Planned: FastAPI, GitHub Actions.
 
 ## Project layout
 
@@ -161,6 +175,7 @@ src/coding_agent/
   sandbox/      Docker sandbox, limits, workspace, static scan
   llm/          Groq client with rate-limit handling, role routing, cost tracking
   evaluation/   tasks, grader, metrics, baselines, runner, safety suite
+  tracing/      optional Langfuse tracing: setup, masking, per-run trace context
   cli.py, cli_support/   command line: parsing, wiring, step printing
 benchmarks/tasks/   the benchmark: prompt, fixtures, hidden tests, reference per task
 docker/             sandbox image definition
