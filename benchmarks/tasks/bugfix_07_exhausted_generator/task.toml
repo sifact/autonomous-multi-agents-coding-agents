@@ -1,0 +1,3 @@
+category = "bug_fix"
+difficulty = "medium"
+bug_type = "iterator_exhausted"
