@@ -56,3 +56,23 @@ def load_tasks(root: Path) -> list[Task]:
         d for d in root.iterdir() if d.is_dir() and not d.name.startswith((".", "_"))
     )
     return [load_task(d) for d in dirs]
+
+
+def load_fast_subset(root: Path, subset_file: Path | None = None) -> list[Task]:
+    """Load the tasks named in the fast-subset list, in the order listed.
+
+    The list defaults to ``fast_subset.txt`` next to the tasks directory: one task id per
+    line, blank lines and ``#`` comment lines ignored. An unknown or repeated id is an error,
+    so the quick CI run cannot silently shrink.
+    """
+    path = subset_file if subset_file is not None else root.parent / "fast_subset.txt"
+    ids = [
+        line.strip() for line in path.read_text().splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    if len(ids) != len(set(ids)):
+        raise ValueError(f"{path.name}: duplicate task ids")
+    missing = [i for i in ids if not (root / i).is_dir()]
+    if missing:
+        raise ValueError(f"{path.name}: unknown task ids: {', '.join(missing)}")
+    return [load_task(root / i) for i in ids]

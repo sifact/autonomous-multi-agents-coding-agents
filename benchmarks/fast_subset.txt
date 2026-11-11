@@ -1,0 +1,12 @@
+# Task ids for the CI quick run (one per line): 2 data, 2 file, 1 html, 2 cli, 1 chart, 2 bug-fix.
+# Easy and medium only, each exercising a different skill.
+data_02_top_customers
+data_06_moving_average
+file_02_normalize_text
+file_04_duplicate_files
+html_02_table_rows
+cli_03_kvstore
+cli_04_todo
+chart_02_two_lines
+bugfix_03_shared_default_list
+bugfix_05_leaderboard_ties

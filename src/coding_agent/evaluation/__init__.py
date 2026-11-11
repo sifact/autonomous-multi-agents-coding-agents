@@ -11,7 +11,7 @@ from coding_agent.evaluation.systems import (
     System,
     SystemOutput,
 )
-from coding_agent.evaluation.task import Task, load_task, load_tasks
+from coding_agent.evaluation.task import Task, load_fast_subset, load_task, load_tasks
 from coding_agent.evaluation.validate import CATEGORIES, validate_all, validate_task
 
 __all__ = [
@@ -32,6 +32,7 @@ __all__ = [
     "Task",
     "aggregate",
     "grade",
+    "load_fast_subset",
     "load_task",
     "load_tasks",
     "run_benchmark",
