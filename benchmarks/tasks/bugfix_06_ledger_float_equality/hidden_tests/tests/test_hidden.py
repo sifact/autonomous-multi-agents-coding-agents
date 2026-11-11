@@ -38,7 +38,7 @@ def test_empty_and_trivial_lists():
 
 def test_balance_is_unchanged():
     assert balance([0.1, 0.2, -0.3]) == 0.0
-    assert balance([10.005, 1]) == round(11.005, 2)
+    assert balance([10.25, 1.5, -0.75]) == 11.0
     assert balance([19.99, 5.01]) == 25.0
     assert balance([]) == 0
 

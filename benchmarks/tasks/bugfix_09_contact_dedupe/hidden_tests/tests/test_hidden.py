@@ -58,3 +58,10 @@ def test_email_and_initials_are_unchanged():
     assert initials("ada king  lovelace") == "AKL"
     assert initials("  grace HOPPER ") == "GH"
     assert initials("") == ""
+
+
+def test_case_folding_beyond_ascii_and_sharp_s():
+    assert normalize_name("ΑΣΑ") == normalize_name("αςα") == "ασα"
+    contacts = [{"name": "ΑΣΑ Κ"}, {"name": "αςα κ"}]
+    assert dedupe(contacts) == [{"name": "ΑΣΑ Κ"}]
+    assert find_contact([{"name": "αςα"}], "ΑΣΑ") == {"name": "αςα"}

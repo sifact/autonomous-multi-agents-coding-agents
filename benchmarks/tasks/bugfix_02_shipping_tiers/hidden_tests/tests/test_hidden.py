@@ -19,6 +19,9 @@ def test_just_over_a_limit_moves_to_the_next_tier():
     assert shipping_cost(1.001) == 7.50
     assert shipping_cost(5.001) == 15.00
     assert shipping_cost(20.001) == 30.00
+    assert shipping_cost(1.0001) == 7.50
+    assert shipping_cost(5.0001) == 15.00
+    assert shipping_cost(20.0001) == 30.00
 
 
 def test_weights_inside_each_tier():

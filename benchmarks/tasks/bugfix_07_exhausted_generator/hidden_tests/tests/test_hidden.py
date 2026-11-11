@@ -52,3 +52,19 @@ def test_parse_numbers_is_lazy_and_one_pass():
     with pytest.raises(ValueError):
         next(it)
     assert list(parse_numbers(["4", " ", "5"])) == [4.0, 5.0]
+
+
+def test_parse_numbers_reads_only_what_is_asked_for():
+    consumed = []
+
+    def source():
+        for text in ["5", "6", "7", "8"]:
+            consumed.append(text)
+            yield text
+
+    lazy = parse_numbers(source())
+    assert consumed == []
+    assert next(lazy) == 5.0
+    assert consumed == ["5"]
+    assert next(lazy) == 6.0
+    assert consumed == ["5", "6"]

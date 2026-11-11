@@ -64,3 +64,22 @@ def test_replacement_rules_for_non_dicts():
     assert merge({"a": {"b": 2}}, {"a": None}) == {"a": None}
     assert merge({"a": 1}, {"b": 2}) == {"a": 1, "b": 2}
     assert merge({}, {}) == {}
+
+
+def test_nothing_to_merge_still_returns_a_new_structure():
+    result = build_settings()
+    assert result is not settings.DEFAULTS
+    assert result == ORIGINAL
+    result["paths"]["logs"].append("/x")
+    result["editor"]["tabs"] = 9
+    assert settings.DEFAULTS == ORIGINAL
+
+
+def test_merge_with_empty_overrides_copies_nested_containers():
+    base = {"a": {"b": [1]}, "c": [2]}
+    result = merge(base, {})
+    assert result == base
+    assert result is not base
+    result["a"]["b"].append(9)
+    result["c"].append(9)
+    assert base == {"a": {"b": [1]}, "c": [2]}

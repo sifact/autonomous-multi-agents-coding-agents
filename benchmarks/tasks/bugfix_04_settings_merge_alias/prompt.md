@@ -14,6 +14,9 @@ Contract (keep every name and signature):
 - `merge` never modifies `base` or `overrides`, and the result shares no dict or list with
   either of them: changing something inside the result later must not change `DEFAULTS` or the
   overrides that were passed in.
+- The result is always a new structure (every dict and list in it is new), even when there is
+  nothing to merge: `merge(base, {})` and `build_settings()` never hand back `base` or
+  `DEFAULTS`, or any container inside them.
 - `build_settings(overrides=None)` is `merge(DEFAULTS, overrides)` with no overrides meaning
   an empty dict. `DEFAULTS` itself must stay exactly as defined in the file.
 - The merged values themselves are already right and must stay right.

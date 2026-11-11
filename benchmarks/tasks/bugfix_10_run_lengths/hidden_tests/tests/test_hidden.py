@@ -59,3 +59,15 @@ def test_blocks_of_none_count_like_any_other_block():
     assert longest_run([None]) == 1
     assert is_constant([None, None]) is True
     assert is_constant([None, 0]) is False
+
+
+def test_only_consecutive_values_form_a_block():
+    assert run_lengths([1, 1, 2, 1]) == [(1, 2), (2, 1), (1, 1)]
+    assert longest_run([1, 1, 2, 1, 1, 1]) == 3
+    assert longest_run([1, 2, 1, 2, 1]) == 1
+
+
+def test_blocks_are_compared_with_equality_not_identity():
+    values = [float("1.5"), float("1.5"), [1], [1]]
+    assert run_lengths(values) == [(1.5, 2), ([1], 2)]
+    assert longest_run([float("1000.5"), float("1000.5"), 3]) == 2
