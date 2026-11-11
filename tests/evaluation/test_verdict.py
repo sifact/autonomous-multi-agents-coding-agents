@@ -157,7 +157,9 @@ def test_more_than_ten_percent_crashed_tasks_is_not_comparable(tmp_path):
     _sys(tmp_path, "graph", g)
     _sys(tmp_path, "single_agent", b)
     text = compare(load_results(tmp_path))
-    assert "not comparable: 5 of 80 runs crashed" in text and "worse" not in text
+    assert ("not comparable: crashed runs excluded 5 of 40 shared tasks "
+            "(limit 10% of shared tasks)") in text
+    assert "5 of 80 runs crashed" in text and "worse" not in text
 
 
 def test_better_but_five_times_the_tokens_says_so_in_the_same_sentence(tmp_path):
@@ -199,3 +201,67 @@ def test_missing_systems(tmp_path):
     _sys(tmp_path, "graph", {"a": [True]})
     (tmp_path / "single_agent.json").unlink()
     assert "No baseline result" in compare(load_results(tmp_path))
+
+
+def test_tiny_p_values_print_as_a_bound_never_zero(tmp_path):
+    final = line(paired(tmp_path, 20, 0, 0), "- Final pass")
+    assert "p<0.001" in final and "p=0.000" not in final
+
+
+@pytest.mark.parametrize("wins,losses,ties,expected", [
+    (10, 9, 1, "10 wins, 9 losses, 1 tie"),
+    (1, 0, 19, "1 win, 0 losses, 19 ties"),
+    (0, 1, 19, "0 wins, 1 loss, 19 ties"),
+])
+def test_pluralisation(tmp_path, wins, losses, ties, expected):
+    assert expected in line(paired(tmp_path, wins, losses, ties), "- Final pass")
+
+
+def test_one_footnote_defines_better(tmp_path):
+    text = paired(tmp_path, 15, 5, 0)
+    notes = [ln for ln in text.splitlines() if ln.startswith("- 'Better' means")]
+    assert len(notes) == 1
+    assert ">= 5 percentage points on the shared tasks AND a sign test p < 0.05" in notes[0]
+    assert "significant" not in text
+    assert "'Better' means" not in paired(tmp_path, 5, 0, 5)  # gated out: no metric lines
+
+
+def _tok_records(system, ids, tin, tout):
+    return [rec(i, system, final=True, tin=tin, tout=tout) for i in ids]
+
+
+def test_token_multiple_uses_only_the_shared_tasks(tmp_path):
+    shared = [f"t{i}" for i in range(25)]
+    g = _tok_records("graph", shared, 2000, 1000) + _tok_records(
+        "graph", [f"x{i}" for i in range(10)], 900_000, 100_000)
+    b = _tok_records("single_agent", shared, 600, 400) + _tok_records(
+        "single_agent", [f"y{i}" for i in range(10)], 1, 1)
+    for r in b[:10]:
+        r["final_pass"] = r["matched_budget_pass"] = False
+    write(tmp_path, "g.json", payload("graph", g))
+    write(tmp_path, "a.json", payload("single_agent", b))
+    final = line(compare(load_results(tmp_path)), "- Final pass")
+    assert final.endswith("at 3.0x the tokens.")
+
+
+def test_zero_token_baseline_is_not_comparable(tmp_path):
+    g = _tok_records("graph", [f"t{i}" for i in range(25)], 100, 100)
+    b = _tok_records("single_agent", [f"t{i}" for i in range(25)], 0, 0)
+    for r in b:
+        r["final_pass"] = r["matched_budget_pass"] = False
+    write(tmp_path, "g.json", payload("graph", g))
+    write(tmp_path, "a.json", payload("single_agent", b))
+    final = line(compare(load_results(tmp_path)), "- Final pass")
+    assert "is better" in final and final.endswith("token cost not comparable.")
+
+
+def test_unknown_token_counts_are_skipped_not_fatal(tmp_path):
+    ids = [f"t{i}" for i in range(25)]
+    g = _tok_records("graph", ids, 2000, 1000)
+    g[0]["tokens_in"] = None
+    b = _tok_records("single_agent", ids, 600, 400)
+    for r in b:
+        r["final_pass"] = r["matched_budget_pass"] = False
+    write(tmp_path, "g.json", payload("graph", g))
+    write(tmp_path, "a.json", payload("single_agent", b))
+    assert line(compare(load_results(tmp_path)), "- Final pass").endswith("at 3.0x the tokens.")

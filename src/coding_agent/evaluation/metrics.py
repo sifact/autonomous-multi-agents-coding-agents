@@ -3,7 +3,8 @@
 Crashed runs (``error`` set) count as FAILURES in every pass rate but are left
 out of the resource means (attempts, tokens, cost, wall time): a crash that
 stopped early must not make a system look cheaper or faster. Their spend is
-still visible in ``total_tokens_all``.
+still visible in ``total_tokens_all``. A run with an unknown (None) token count is left
+out of the token numbers, never counted as zero.
 """
 from dataclasses import dataclass
 from statistics import fmean
@@ -30,6 +31,13 @@ class RunRecord:
     error: str | None = None  # set when the run crashed; the record then counts as failed
     repeat: int = 0
     fixed_and_passed: bool = False  # fixed_within_3 AND final_pass
+
+    @property
+    def tokens(self) -> int | None:
+        """Total tokens, or None when either count is unknown (old or hand-written files)."""
+        if self.tokens_in is None or self.tokens_out is None:
+            return None
+        return self.tokens_in + self.tokens_out
 
 
 @dataclass(frozen=True)
@@ -82,7 +90,7 @@ def aggregate(records: list[RunRecord]) -> Metrics:
         mean_cost_usd=mean(costs),
         cost_known_count=len(costs),
         cost_known=bool(ok) and len(costs) == len(ok),
-        mean_tokens=mean(r.tokens_in + r.tokens_out for r in ok),
+        mean_tokens=mean(r.tokens for r in ok if r.tokens is not None),
         mean_wall_s=mean(r.wall_s for r in ok),
-        total_tokens_all=sum(r.tokens_in + r.tokens_out for r in records),
+        total_tokens_all=sum(r.tokens for r in records if r.tokens is not None),
     )

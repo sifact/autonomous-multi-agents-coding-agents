@@ -139,3 +139,44 @@ def test_symlinked_readme_is_written_through_and_stays_a_link(tmp_path):
     assert "TABLE" in real.read_text()
     assert sorted(p.name for p in tmp_path.iterdir()) == ["README.md", "docs"]
     assert [p.name for p in real.parent.iterdir()] == ["REAL.md"]
+
+
+# --- fix round 2: unclosed fences and indented markers ----------------------
+
+
+@pytest.mark.parametrize("text", [
+    "# T\n\n```\ncode never closed\n",
+    f"# T\n\n```\n{START}\nx\n{END}\n",
+    "# T\n\n## Status\n\n~~~\nopen\n",
+])
+def test_unclosed_fence_is_refused(text):
+    with pytest.raises(ReadmeMarkerError, match="unclosed code fence"):
+        replace_block(text, "T")
+
+
+def test_unclosed_fence_leaves_the_file_unchanged(tmp_path):
+    path = tmp_path / "README.md"
+    path.write_text("# T\n\n```\ncode\n")
+    for _ in range(2):
+        with pytest.raises(ReadmeMarkerError):
+            write_readme_block(path, "T")
+    assert path.read_text() == "# T\n\n```\ncode\n"
+    assert [p.name for p in tmp_path.iterdir()] == ["README.md"]
+
+
+def test_a_properly_closed_fence_still_works():
+    text = f"# T\n\n```\ncode\n```\n\n{START}\nold\n{END}\n"
+    assert replace_block(text, "NEW").endswith(f"{START}\nNEW\n{END}\n")
+
+
+@pytest.mark.parametrize("indent", ["    ", "\t", "     "])
+def test_indented_code_block_markers_are_ignored(indent):
+    text = f"# T\n\n{indent}{START}\n{indent}old\n{indent}{END}\n"
+    out = replace_block(text, "NEW")
+    assert f"{indent}{START}\n{indent}old\n{indent}{END}\n" in out
+    assert out.endswith(f"## Results\n\n{START}\nNEW\n{END}\n")
+
+
+def test_up_to_three_spaces_of_indent_still_counts():
+    text = f"   {START}\nold\n  {END}\n"
+    assert replace_block(text, "NEW") == f"   {START}\nNEW\n  {END}\n"

@@ -10,7 +10,8 @@ code block (``` or ~~~), so examples and quoted prose never get overwritten; the
 read and written as bytes and the block uses the file's own newline style (CRLF stays
 CRLF); a symlinked README is written through to its target and stays a link. Odd marker
 layouts are refused rather than guessed at, because a wrong guess would overwrite
-hand-written text.
+hand-written text. An unclosed code fence is refused for the same reason, and a marker
+indented four or more spaces (or by a tab) is an indented code block, not a marker.
 """
 import contextlib
 import os
@@ -47,6 +48,9 @@ def _scan(lines: list[str]) -> tuple[list[int], list[int], int | None]:
                     and not match.group(3).strip():
                 fence = None
             continue
+        indent = body[:len(body) - len(body.lstrip())]
+        if "\t" in indent or len(indent) > 3:
+            continue  # indented code block, not a marker or heading
         stripped = body.strip()
         if stripped == START:
             starts.append(i)
@@ -54,6 +58,11 @@ def _scan(lines: list[str]) -> tuple[list[int], list[int], int | None]:
             ends.append(i)
         elif status is None and stripped == _STATUS:
             status = i
+    if fence is not None:
+        # Everything after an unclosed fence looks "inside" it, so a section appended at
+        # the end would land in the fence and be re-appended on every run.
+        raise ReadmeMarkerError(
+            "README has an unclosed code fence; fix it before using --write-readme")
     return starts, ends, status
 
 

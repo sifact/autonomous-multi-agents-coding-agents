@@ -62,3 +62,23 @@ def test_select_latest_keeps_one_per_system_variant(tmp_path):
     picked = select_latest(load_results(tmp_path))
     assert {(r.variant, r.metrics.final_pass_rate) for r in picked} == {
         ("full", 1.0), ("no-planner", 0.5)}
+
+
+def test_none_token_counts_are_unknown_not_fatal(tmp_path):
+    records = runs("graph", 4, 3)
+    records[0]["tokens_in"] = None
+    records[1]["tokens_out"] = None
+    write(tmp_path, "a.json", payload("graph", records))
+    warnings = []
+    (r,) = load_results(tmp_path, on_warning=warnings.append)
+    assert warnings == [] and r.metrics.n_records == 4
+    assert r.metrics.mean_tokens == 1000 and r.metrics.total_tokens_all == 2000
+
+
+def test_all_unknown_tokens_give_no_mean(tmp_path):
+    records = runs("graph", 2, 1)
+    for rec_ in records:
+        rec_["tokens_in"] = None
+    write(tmp_path, "a.json", payload("graph", records))
+    (r,) = load_results(tmp_path)
+    assert r.metrics.mean_tokens is None and r.metrics.total_tokens_all == 0

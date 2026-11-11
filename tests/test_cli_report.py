@@ -118,3 +118,15 @@ def test_tasks_dir_option_feeds_the_breakdown(results, tmp_path):
     missing = runner.invoke(app, ["report", "--results-dir", str(results), "--by-category",
                                   "--tasks-dir", str(tmp_path / "nope")])
     assert missing.exit_code == 0 and "Breakdown skipped" in missing.output
+
+
+def test_unclosed_fence_readme_exits_1_and_is_never_changed(results, tmp_path):
+    readme = tmp_path / "README.md"
+    original = "# T\n\n```\nunclosed\n"
+    readme.write_text(original)
+    write(results, "g.json", payload("graph", runs("graph", 4, 3)))
+    args = ["report", "--results-dir", str(results), "--write-readme", "--readme", str(readme)]
+    for _ in range(2):
+        out = runner.invoke(app, args)
+        assert out.exit_code == 1 and "unclosed code fence" in out.output
+        assert readme.read_bytes() == original.encode()

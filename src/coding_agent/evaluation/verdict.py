@@ -30,6 +30,10 @@ ALPHA = 0.05
 MAX_CRASH_SHARE = 0.10
 BASELINES = ("single_agent", "single_shot")
 CRASH_NOTE = "infrastructure failures, not agent quality"
+BETTER_NOTE = (
+    "- 'Better' means a mean gain of >= 5 percentage points on the shared tasks AND a "
+    "sign test p < 0.05 (a loss of that size is 'worse'); anything else is 'no clear difference'."
+)
 
 
 def sign_test_p(wins: int, losses: int) -> float:
@@ -60,16 +64,31 @@ def _by_task(result: ResultFile) -> dict[str, list[RunRecord]]:
     return tasks
 
 
-def _tokens(graph: ResultFile, base: ResultFile) -> str:
-    g, b = graph.metrics.mean_tokens, base.metrics.mean_tokens
-    if g is None or not b:
+def _tokens(usable: list[str], gt: dict, bt: dict) -> str:
+    """Token multiple over the SAME tasks as the paired comparison (error-free runs only)."""
+    g: list[float] = []
+    b: list[float] = []
+    for t in usable:
+        gk = [r.tokens for r in gt[t] if r.error is None and r.tokens is not None]
+        bk = [r.tokens for r in bt[t] if r.error is None and r.tokens is not None]
+        if gk and bk:
+            g.append(fmean(gk))
+            b.append(fmean(bk))
+    if not g or fmean(b) == 0:
         return "token cost not comparable"
-    return f"at {g / b:.1f}x the tokens"
+    return f"at {fmean(g) / fmean(b):.1f}x the tokens"
+
+
+def _p(value: float) -> str:
+    return "p<0.001" if value < 0.001 else f"p={value:.3f}"
+
+
+def _count(n: int, one: str, many: str) -> str:
+    return f"{n} {one if n == 1 else many}"
 
 
 def _metric_line(
-    name: str, attr: str, ids: list[str], gt: dict, bt: dict, graph: ResultFile,
-    base: ResultFile,
+    name: str, attr: str, ids: list[str], gt: dict, bt: dict, base: ResultFile,
 ) -> tuple[str, str]:
     diffs = [
         fmean(getattr(r, attr) for r in gt[t]) - fmean(getattr(r, attr) for r in bt[t])
@@ -84,9 +103,10 @@ def _metric_line(
     runs_g, runs_b = sum(len(gt[t]) for t in ids), sum(len(bt[t]) for t in ids)
     detail = (
         f"{diff_pp:+.1f} pp; {len(ids)} shared tasks, {runs_g} vs {runs_b} runs; "
-        f"{wins} wins, {losses} losses, {ties} ties; sign test p={sign_test_p(wins, losses):.3f}"
+        f"{_count(wins, 'win', 'wins')}, {_count(losses, 'loss', 'losses')}, "
+        f"{_count(ties, 'tie', 'ties')}; sign test {_p(sign_test_p(wins, losses))}"
     )
-    return outcome, f"- {name}: {verdict} ({detail}) {_tokens(graph, base)}."
+    return outcome, f"- {name}: {verdict} ({detail}) {_tokens(ids, gt, bt)}."
 
 
 def _compare_one(graph: ResultFile, base: ResultFile) -> list[str]:
@@ -108,7 +128,10 @@ def _compare_one(graph: ResultFile, base: ResultFile) -> list[str]:
     if len(bad) / len(shared) > MAX_CRASH_SHARE:
         crashed = sum(bool(r.error) for t in shared for r in gt[t] + bt[t])
         shared_runs = sum(len(gt[t]) + len(bt[t]) for t in shared)
-        return [f"{prefix} not comparable: {crashed} of {shared_runs} runs crashed ({CRASH_NOTE})."]
+        text = (f"{prefix} not comparable: crashed runs excluded {len(bad)} of {len(shared)} "
+                f"shared tasks (limit {MAX_CRASH_SHARE:.0%} of shared tasks); {crashed} of "
+                f"{shared_runs} runs crashed ({CRASH_NOTE}).")
+        return [text]
     usable = [t for t in shared if t not in bad]
     lines: list[str] = []
     if bad:
@@ -121,9 +144,9 @@ def _compare_one(graph: ResultFile, base: ResultFile) -> list[str]:
                 f"{MIN_SHARED_TASKS});{sets} results on so few tasks are a smoke test only.")
         return [text, *lines]
     final, text = _metric_line(
-        "Final pass", "final_pass", usable, gt, bt, graph, base)
+        "Final pass", "final_pass", usable, gt, bt, base)
     matched, text2 = _metric_line(
-        "Budget-matched pass", "matched_budget_pass", usable, gt, bt, graph, base)
+        "Budget-matched pass", "matched_budget_pass", usable, gt, bt, base)
     lines = [text, text2, *lines]
     if final == "better" and matched != "better":
         lines.append(
@@ -155,6 +178,8 @@ def compare(results: list[ResultFile]) -> str:
     for name in BASELINES:
         if name in latest:
             lines += _compare_one(graph, latest[name])
+    if any(ln.startswith("- Final pass") for ln in lines):
+        lines.append(BETTER_NOTE)
     if len(lines) == 1:
         lines.append("- No baseline result (single_agent or single_shot) to compare against.")
     return "\n".join(lines)

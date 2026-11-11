@@ -110,7 +110,7 @@ No results published yet. The benchmark runs need a Groq API key and have not be
 | Architecture diagrams (high-level and low-level) | Done: see [Design diagrams](#design-diagrams) |
 | Demo GIF of a self-repair | Planned |
 
-The test suite (597 tests) passes locally, including the tests that run against the real sandbox.
+The test suite (617 tests) passes locally, including the tests that run against the real sandbox.
 
 ## Design diagrams
 
