@@ -23,16 +23,19 @@ import random
 import subprocess
 import time
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from coding_agent.config import Settings
 from coding_agent.evaluation.grader import grade
 from coding_agent.evaluation.metrics import RunRecord, aggregate
 from coding_agent.evaluation.systems import System, SystemOutput
 from coding_agent.evaluation.task import Task
 from coding_agent.llm import Usage
 from coding_agent.sandbox import Sandbox
+from coding_agent.tracing import TraceRun, trace_run
 
 REPO_ROOT = Path(__file__).resolve().parents[3]  # src/coding_agent/evaluation -> repo root
 DEFAULT_OUT_DIR = REPO_ROOT / "benchmarks" / "results"
@@ -110,6 +113,34 @@ def _crash_record(
     )
 
 
+def result_id(system_name: str, timestamp: datetime) -> str:
+    """Stem of the result file; also the Langfuse session id so traces and file line up."""
+    return f"{system_name}-{timestamp.strftime('%Y%m%dT%H%M%S%fZ')}"
+
+
+def _task_trace(
+    tracing: Settings | None, session_id: str, system_name: str, task: Task
+) -> AbstractContextManager[TraceRun]:
+    """One Langfuse trace per task run (a no-op context when tracing is not requested)."""
+    if tracing is None:
+        return nullcontext(TraceRun())
+    return trace_run(
+        tracing, session_id=session_id, system=system_name, task_id=task.id,
+        input_text=task.prompt, tags=[task.category],
+    )
+
+
+def _record_in_trace(trace: TraceRun, record: RunRecord) -> None:
+    """Small trace output plus the graded outcomes as Langfuse scores."""
+    trace.set_output({
+        "final_pass": record.final_pass, "first_try_pass": record.first_try_pass,
+        "matched_budget_pass": record.matched_budget_pass, "attempts": record.attempts,
+        "tokens_in": record.tokens_in, "tokens_out": record.tokens_out, "error": record.error,
+    })
+    for name in ("final_pass", "first_try_pass", "matched_budget_pass"):
+        trace.score(name, getattr(record, name))
+
+
 def save_results(
     out_dir: Path, system: System, records: list[RunRecord], tasks: list[Task], *,
     seed: int, repeats: int, max_runs_per_min: int | None, timestamp: datetime,
@@ -133,7 +164,7 @@ def save_results(
         "metrics": dataclasses.asdict(aggregate(records)) if records else None,
     }
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"{system.name}-{timestamp.strftime('%Y%m%dT%H%M%S%fZ')}.json"
+    path = out_dir / f"{result_id(system.name, timestamp)}.json"
     path.write_text(json.dumps(payload, indent=2))
     return path
 
@@ -142,7 +173,7 @@ def run_benchmark(
     tasks: list[Task], system: System, sandbox: Sandbox, repeats: int = 1, seed: int = 0,
     max_runs_per_min: int | None = None, out_dir: Path | None = None,
     on_record: Callable[[RunRecord], None] | None = None,
-    on_saved: Callable[[Path], None] | None = None,
+    on_saved: Callable[[Path], None] | None = None, tracing: Settings | None = None,
 ) -> list[RunRecord]:
     """Run ``system`` over ``tasks`` x ``repeats``, grade with hidden tests, save, return records.
 
@@ -151,8 +182,13 @@ def run_benchmark(
     (``Settings.max_rpm``) lives in the Groq client; this only keeps a benchmark
     of many quick tasks from bursting. ``on_saved(path)`` is called with the result file's
     path once it is written, including when the run crashes or is interrupted.
+
+    ``tracing`` (the Settings carrying Langfuse keys) turns on one trace per task run, all in
+    one session named after the result file; scores are attached after grading. It is a
+    no-op without keys.
     """
     started = datetime.now(UTC)
+    session = result_id(system.name, started)
     records: list[RunRecord] = []
     failures = 0
     last_exc: Exception | None = None
@@ -166,13 +202,17 @@ def run_benchmark(
                         _sleep(wait)
                 last_start = time.monotonic()
                 random.seed(seed + repeat)
-                try:
-                    record = _grade_record(task, system.name, system.solve(task), sandbox, repeat)
-                    failures = 0
-                except Exception as exc:  # noqa: BLE001 - one task must not kill the benchmark
-                    record = _crash_record(
-                        task, system.name, exc, time.monotonic() - last_start, repeat)
-                    failures, last_exc = failures + 1, exc
+                with _task_trace(tracing, session, system.name, task) as trace:
+                    try:
+                        record = _grade_record(
+                            task, system.name, system.solve(task), sandbox, repeat)
+                        failures = 0
+                    except Exception as exc:  # noqa: BLE001 - one task must not kill the run
+                        record = _crash_record(
+                            task, system.name, exc, time.monotonic() - last_start, repeat)
+                        failures, last_exc = failures + 1, exc
+                        trace.record_error(exc)
+                    _record_in_trace(trace, record)
                 records.append(record)
                 if on_record:
                     on_record(record)

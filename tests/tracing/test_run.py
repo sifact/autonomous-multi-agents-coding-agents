@@ -96,3 +96,15 @@ def test_tracing_failures_never_break_the_run(keyed, monkeypatch, caplog):
         assert run.callbacks == []
         ran = True
     assert ran
+
+
+def test_seeded_random_does_not_collide_trace_ids(keyed, memory):
+    """The benchmark reseeds ``random`` before every task; trace ids must not follow it."""
+    import random
+
+    ids = []
+    for _ in range(2):
+        random.seed(0)
+        with trace_run(keyed, session_id="s", system="graph", input_text="x") as run:
+            ids.append(run.trace_id)
+    assert ids[0] != ids[1]

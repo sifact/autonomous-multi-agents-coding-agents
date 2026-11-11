@@ -20,6 +20,8 @@ from coding_agent.evaluation.runner import REPO_ROOT
 from coding_agent.evaluation.systems import System
 from coding_agent.llm import ModelRouter, UsageTracker
 from coding_agent.sandbox import DockerSandbox
+from coding_agent.tracing import flush as flush_traces
+from coding_agent.tracing import trace_run, tracing_status_line
 
 MISSING_KEY_MESSAGE = "GROQ_API_KEY is not set. Copy .env.example to .env and add your key"
 DOCKER_DOWN_MESSAGE = (
@@ -28,6 +30,8 @@ DOCKER_DOWN_MESSAGE = (
 )
 BUILD_COMMAND = "docker build -t coding-agent-sandbox:latest -f docker/sandbox.Dockerfile ."
 SYSTEMS = ("single_shot", "single_agent", "graph")
+# The CLI calls the tracing helpers as ``deps.<name>`` so tests can patch them here.
+TRACING_HELPERS = (flush_traces, trace_run, tracing_status_line)
 
 
 class SetupError(RuntimeError):

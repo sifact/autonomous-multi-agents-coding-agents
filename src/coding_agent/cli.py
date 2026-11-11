@@ -121,6 +121,7 @@ def run(
     """Run the agent on TASK and write the resulting files."""
     task = _validated_task(task)
     settings = _settings(max_rpm)
+    show(deps.tracing_status_line(settings))
     tracker = UsageTracker()
     try:
         router = deps.make_router(settings, tracker, all_strong)
@@ -132,18 +133,25 @@ def run(
     final = None
     attempts = 0  # code generations: first draft + every repair or replan rewrite
     start = time.monotonic()
+    session = "run-" + datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     try:
         graph = build_graph(router, sandbox, settings)
-        for node, update in stream_task(graph, task):
-            if node == "finalize":
-                final = update["final"]
-            else:
-                attempts += node == "coder"
-                printer.handle(node, update)
+        with deps.trace_run(
+            settings, session_id=session, system="graph", input_text=task
+        ) as trace:
+            for node, update in stream_task(graph, task, config=trace.config or None):
+                if node == "finalize":
+                    final = update["final"]
+                    trace.set_report(final)
+                else:
+                    attempts += node == "coder"
+                    printer.handle(node, update)
     except KeyboardInterrupt as exc:
         raise _fail("Interrupted.", EXIT_INTERRUPTED) from exc
     except Exception as exc:
         raise _api_failure(exc) from exc
+    finally:
+        deps.flush_traces()  # short-lived process: send queued traces before exiting
     wall = time.monotonic() - start
     if final is None:
         raise _fail("The run ended without a final report.", EXIT_FAILED)
@@ -187,6 +195,7 @@ def eval_(
 ) -> None:
     """Run the benchmark for one system and print the headline metrics."""
     settings = _settings(max_rpm)
+    show(deps.tracing_status_line(settings))
     try:
         deps.make_router(settings, UsageTracker(), all_strong)  # fail early on a missing key
         sandbox = deps.make_sandbox(settings)
@@ -208,6 +217,7 @@ def eval_(
         records = run_benchmark(
             tasks, eval_system, sandbox, repeats=repeats, max_runs_per_min=max_runs_per_min,
             out_dir=out_dir, on_record=lambda r: show(record_line(r)), on_saved=saved.append,
+            tracing=settings,
         )
     except KeyboardInterrupt as exc:
         _report_saved(saved, partial=True)
@@ -215,6 +225,8 @@ def eval_(
     except Exception as exc:
         _report_saved(saved, partial=True)
         raise _api_failure(exc) from exc
+    finally:
+        deps.flush_traces()
     show("")
     show("\n".join(metrics_lines(aggregate(records))))
     _report_saved(saved, partial=False)

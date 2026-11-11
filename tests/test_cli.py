@@ -240,7 +240,7 @@ def _fake_stream(monkeypatch, settings, updates, files=None, success=True):
     monkeypatch.setattr(deps, "make_sandbox", lambda s: object())
     monkeypatch.setattr("coding_agent.cli.build_graph", lambda *a, **k: None)
 
-    def stream(graph, task, fixtures=None):
+    def stream(graph, task, fixtures=None, config=None):
         for u in updates:
             if isinstance(u, BaseException):
                 raise u

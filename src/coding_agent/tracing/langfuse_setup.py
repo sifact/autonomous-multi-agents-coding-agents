@@ -30,10 +30,13 @@ def tracing_enabled(settings: Settings) -> bool:
 
 def client_kwargs(settings: Settings) -> dict[str, Any]:
     """Arguments for ``Langfuse(...)``: keys, host and the secret-scrubbing mask."""
+    from coding_agent.tracing.ids import SecureIdGenerator
+
     public, secret = _secret(settings.langfuse_public_key), _secret(settings.langfuse_secret_key)
     return {
         "public_key": public, "secret_key": secret, "base_url": settings.langfuse_host,
         "mask": make_mask([public, secret, _secret(settings.groq_api_key)]),
+        "id_generator": SecureIdGenerator(),
     }
 
 
